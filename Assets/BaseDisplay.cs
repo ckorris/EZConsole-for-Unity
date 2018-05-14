@@ -8,6 +8,7 @@ using UnityEngine;
 /// Example: "BarDisplay : BaseDisplay<float>"
 /// </summary>
 /// <typeparam name="T"></typeparam>
+[Serializable]
 public class BaseDisplay<T> : BaseDisplay
 {
     public Type DisplayType

@@ -31,7 +31,7 @@ public class BaseControl<T> : BaseControl
         }
 
         //Add the new action to the list for that component. Sound the alarm if you're doing it twice. 
-        if (_delegateDictionary[target].Contains(del))
+        if (!_delegateDictionary[target].Contains(del))
         {
             _delegateDictionary[target].Add(del);
         }
