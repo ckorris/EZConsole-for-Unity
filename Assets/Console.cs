@@ -13,7 +13,14 @@ public class Console : MonoBehaviour
     [SerializeField]
     public MonoScript CompileTimeScript; //For compile-time, and briefly at Start for reflection purposes. 
     [SerializeField]
-    public Component RuntimeScript; //The script attached to the gameobject from which we actually create the delegates. 
+    private Component _runtimeScript;//The script attached to the gameobject from which we actually create the delegates. 
+    public Component RuntimeScript
+    {
+        get
+        {
+            return _runtimeScript;
+        }
+    }
 
     //Bindings lists
     [SerializeField]
@@ -24,6 +31,8 @@ public class Console : MonoBehaviour
     //Methodinfos of methods we'll turn generic. Cached for performance, because reflection. 
     MethodInfo _displayRegisterMethod;
     MethodInfo _controlRegisterMethod;
+    MethodInfo _displayDeregisterMethod;
+    MethodInfo _controlDeregisterMethod;
 
     //Testing, remove later. 
     public BaseDisplay TestDisplay;
@@ -42,6 +51,8 @@ public class Console : MonoBehaviour
         //Cache MethodInfos for the register methods, so we can make them generic later without repeating these particular reflection calls. 
         _displayRegisterMethod = typeof(Console).GetMethod("RegisterDisplayHelper", BindingFlags.Instance | BindingFlags.NonPublic);
         _controlRegisterMethod = typeof(Console).GetMethod("RegisterControlHelper", BindingFlags.Instance | BindingFlags.NonPublic);
+        _displayDeregisterMethod = typeof(Console).GetMethod("DeregisterDisplayHelper", BindingFlags.Instance | BindingFlags.NonPublic);
+        _controlDeregisterMethod = typeof(Console).GetMethod("DeregisterControlHelper", BindingFlags.Instance | BindingFlags.NonPublic);
 
         #region Hard-Coded Test 
         if (false) //Change to turn this test on/off. 
@@ -82,9 +93,90 @@ public class Console : MonoBehaviour
         }
         #endregion
 
+        //Actually set up the bindings
+        SetUpBindings();
+
     }
 
-    #region Display Register Methods
+    public void ChangeRuntimeScript(Component newscript) //Method instead of a setter as it involves lots of reflection. 
+    {
+        if (newscript != _runtimeScript)
+        {
+            if (Application.isPlaying)
+            {
+                if (_runtimeScript != null)
+                {
+                    DeregisterAll(_runtimeScript);
+                }
+
+                _runtimeScript = newscript;
+
+                if (_runtimeScript != null)
+                {
+                    SetUpBindings();
+                }
+            }
+            else
+            {
+                _runtimeScript = newscript;
+            }
+        }
+    }
+
+    private void SetUpBindings()
+    {
+        //Display bindings first
+        foreach (DisplayBinding dispbind in DisplayBindingsList)
+        {
+            if (dispbind.Display)
+            {
+                MethodInfo method = CompileTimeScript.GetClass().GetMethod(dispbind.MethodName);
+                RegisterIntoDisplay(method, dispbind.Display);
+            }
+        }
+
+        //Control bindings
+        foreach (ControlBinding contbind in ControlBindingsList)
+        {
+            if (contbind.Control)
+            {
+                MethodInfo method = CompileTimeScript.GetClass().GetMethod(contbind.MethodName);
+                RegisterIntoControl(method, contbind.Control);
+            }
+        }
+    }
+
+    public void DeregisterAll(Component oldcomponent)
+    {
+        //Display
+        foreach (DisplayBinding dispbind in DisplayBindingsList)
+        {
+            if (dispbind.Display == null) //No display to deregister
+            {
+                continue;
+            }
+
+            Type disptype = (Type)dispbind.Display.GetType().GetMethod("get_DisplayType").Invoke(dispbind.Display, null);
+            MethodInfo deregisterhelpergeneric = _displayDeregisterMethod.MakeGenericMethod(disptype);
+            deregisterhelpergeneric.Invoke(this, new object[] { oldcomponent, dispbind.Display });
+        }
+
+        //Control
+        foreach (ControlBinding contbind in ControlBindingsList)
+        {
+            if (contbind.Control == null) //No control to deregister
+            {
+                continue;
+            }
+
+            Type conttype = (Type)contbind.Control.GetType().GetMethod("get_ControlType").Invoke(contbind.Control, null);
+            MethodInfo deregisterhelpergeneric = _controlDeregisterMethod.MakeGenericMethod(conttype);
+            deregisterhelpergeneric.Invoke(this, new object[] { oldcomponent, contbind.Control });
+        }
+    }
+
+
+    #region Display Register/Deregister Methods
     /// <summary>
     /// Registers a method into a display by making RegisterDisplayHandler generic and passing the given type into it. 
     /// Calling this allows you to assign displays without handling generics yourself. 
@@ -121,13 +213,26 @@ public class Console : MonoBehaviour
     private void RegisterDisplayHelper<T>(MethodInfo info, BaseDisplay display)
     {
         BaseDisplay<T> casteddisplay = display as BaseDisplay<T>; //Cast so we can interact with it directly - BaseDisplay is an empty class used for simple references. 
-        Func<T> casteddelegate = (Func<T>)Delegate.CreateDelegate(typeof(Func<T>), RuntimeScript, info);
-        casteddisplay.RegisterDisplayDelegate(RuntimeScript, casteddelegate);
+        Func<T> casteddelegate = (Func<T>)Delegate.CreateDelegate(typeof(Func<T>), _runtimeScript, info);
+        casteddisplay.RegisterDisplayDelegate(_runtimeScript, casteddelegate);
 
+    }
+
+    /// <summary>
+    /// Deregisters a component from a selected display. 
+    /// Called by Deregister functions, where it gets cast as a generic method, then T can be set properly. 
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
+    /// <param name="component"></param>
+    /// <param name="display"></param>
+    private void DeregisterDisplayHelper<T>(Component component, BaseDisplay display)
+    {
+        BaseDisplay<T> casteddisplay = display as BaseDisplay<T>; //Cast so we can interact with it directly - BaseDisplay is an empty class used for simple references. 
+        casteddisplay.Deregister(display);
     }
     #endregion
 
-    #region Control Register Methods
+    #region Control Register/Deregister Methods
 
     /// <summary>
     /// egisters a method into a control by making RegisterController generic and passing the given type into it. 
@@ -164,11 +269,23 @@ public class Console : MonoBehaviour
     private void RegisterControlHelper<T>(MethodInfo info, BaseControl control)
     {
         BaseControl<T> castedcontrol = control as BaseControl<T>; //Cast so we can interact with it directly - BaseControl is an empty class used for simple references. 
-        Action<T> casteddelegate = (Action<T>)Delegate.CreateDelegate(typeof(Action<T>), RuntimeScript, info);
-        castedcontrol.RegisterControlDelegate(RuntimeScript, casteddelegate);
+        Action<T> casteddelegate = (Action<T>)Delegate.CreateDelegate(typeof(Action<T>), _runtimeScript, info);
+        castedcontrol.RegisterControlDelegate(_runtimeScript, casteddelegate);
 
     }
 
+    /// <summary>
+    /// Deregsiters a component from a selected control. 
+    /// Called by Deregister functions, where it gets cast as a generic method, then T can be set properly. 
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
+    /// <param name="component"></param>
+    /// <param name="control"></param>
+    private void DeregisterControlHelper<T>(Component component, BaseControl control)
+    {
+        BaseControl<T> castedcontrol = control as BaseControl<T>;
+        castedcontrol.Deregister(component);
+    }
     #endregion
 
 }
@@ -178,6 +295,7 @@ public struct DisplayBinding
 {
     public string MethodName; //We store the name because a MethodInfo can't be serialized.
     public BaseDisplay Display;
+    public string TypeString; //The type of the method displayed. As a string so we can efficiently display it in the editor. 
 }
 
 [Serializable]
@@ -185,6 +303,7 @@ public struct ControlBinding
 {
     public string MethodName; //We store the name because a MethodInfo can't be serialized.
     public BaseControl Control;
+    public string ParamString; //The types of the method's parameters. As a string so we can efficiently display it in the editor. 
 }
 
 
@@ -233,12 +352,13 @@ public class ConsoleEditor : Editor
 
     public override void OnInspectorGUI()
     {
-        DrawDefaultInspector();
+        //DrawDefaultInspector();
 
-        if(_script != _lastScript)
+        if (_script != _lastScript)
         {
             //The script got changed, clean house. 
             UpdateBindings();
+            _lastScript = _script;
         }
 
         //Don't allow changing the target script during runtime
@@ -252,33 +372,81 @@ public class ConsoleEditor : Editor
         //Target component
         EditorGUILayout.BeginHorizontal();
         EditorGUILayout.LabelField("Runtime Component: ", EditorStyles.boldLabel);
-        _console.RuntimeScript = (Component)EditorGUILayout.ObjectField(_console.RuntimeScript, _scriptType, true, null);
+        //_console.RuntimeScript = (Component)EditorGUILayout.ObjectField(_console.RuntimeScript, _scriptType, true, null);
+        Component newcomponent = (Component)EditorGUILayout.ObjectField(_console.RuntimeScript, _scriptType, true, null);
+        if (newcomponent != _console.RuntimeScript)
+        {
+            _console.ChangeRuntimeScript(newcomponent);
+        }
+
         EditorGUILayout.EndHorizontal();
 
         //Display bindings
-        for(int i = 0; i < _console.DisplayBindingsList.Count; i++)
+        EditorGUILayout.Space();
+        EditorGUILayout.LabelField("Display Properties", EditorStyles.boldLabel);
+
+        for (int i = 0; i < _console.DisplayBindingsList.Count; i++)
         {
             DisplayBinding dbind = _console.DisplayBindingsList[i]; //Shorthand
+
             EditorGUILayout.BeginHorizontal();
-            EditorGUILayout.LabelField(dbind.MethodName + ": ");
 
             //Figure out the BaseDisplay type 
             Type generic = typeof(BaseDisplay<>);
-            Type constructed = generic.MakeGenericType(new Type[1] { _scriptType.GetMethod(dbind.MethodName).ReturnType }); //Too SLOW
+            Type constructed = generic.MakeGenericType(new Type[1] { _scriptType.GetMethod(dbind.MethodName).ReturnType }); //This gets called most every frame, so would be nice to optimize later. 
 
-            BaseDisplay basedisp = (BaseDisplay)EditorGUILayout.ObjectField(dbind.Display, constructed, true, null); //Not showing type
+            EditorGUILayout.LabelField(dbind.MethodName + " <" + dbind.TypeString + ">"); //Adding type in label since the object field won't show it properly due to serialization
+
+            BaseDisplay basedisp = (BaseDisplay)EditorGUILayout.ObjectField(dbind.Display, constructed, true, null);
 
             EditorGUILayout.EndHorizontal();
-            
+
             //If the bound object has changed, inject this binding in place of the old one. 
-            if(dbind.Display != basedisp)
+            if (dbind.Display != basedisp)
             {
                 DisplayBinding replacebind = new DisplayBinding
                 {
                     MethodName = dbind.MethodName,
-                    Display = basedisp
+                    Display = basedisp,
+                    TypeString = dbind.TypeString
                 };
                 _console.DisplayBindingsList[i] = replacebind;
+                Debug.Log("Replaced");
+            }
+        }
+
+        //Control bindings
+        EditorGUILayout.Space();
+        EditorGUILayout.LabelField("Control Properties/Methods", EditorStyles.boldLabel);
+
+        for (int i = 0; i < _console.ControlBindingsList.Count; i++)
+        {
+            ControlBinding cbind = _console.ControlBindingsList[i]; //Shorthand
+            EditorGUILayout.BeginHorizontal();
+
+            //Figure out the BaseControl type
+            Type generic = typeof(BaseControl<>);
+            ParameterInfo[] paramsinfo = _scriptType.GetMethod(cbind.MethodName).GetParameters();
+            Type newtype = (paramsinfo.Length > 0) ? paramsinfo[0].ParameterType : typeof(void);
+
+            Type constructed = generic.MakeGenericType(new Type[1] { newtype }); //This gets called most every frame, so would be nice to optimize later. //WRONG fix later
+
+            EditorGUILayout.LabelField(cbind.MethodName + " <" + cbind.ParamString + ">"); //Adding type in label since the object field won't show it properly due to serialization
+
+            BaseControl basecont = (BaseControl)EditorGUILayout.ObjectField(cbind.Control, constructed, true, null);
+
+            EditorGUILayout.EndHorizontal();
+
+            //If the bound object has changed inject this binding in place of old one. 
+            if (cbind.Control != basecont)
+            {
+                ControlBinding replacebind = new ControlBinding
+                {
+                    MethodName = cbind.MethodName,
+                    Control = basecont,
+                    ParamString = cbind.ParamString
+                };
+                _console.ControlBindingsList[i] = replacebind;
                 Debug.Log("Replaced");
             }
         }
@@ -289,89 +457,130 @@ public class ConsoleEditor : Editor
         List<MethodInfo> dispmethods = new List<MethodInfo>();
         List<MethodInfo> contmethods = new List<MethodInfo>();
 
-        //Iterate through methods and assign relevant ones to bindings list
-        MethodInfo[] methods = _scriptType.GetMethods(BindingFlags.Instance | BindingFlags.Public);
-        for (int i = 0; i < methods.Length; i++)
-        {
-            //Don't do anything if it's part of MonoBehaviour, because the developer didn't add that. 
-            if (methods[i].DeclaringType.IsAssignableFrom(typeof(MonoBehaviour)))
-            {
-                continue;
-            }
-
-            //Assign everything into a relevant list, if there is one. 
-            if (methods[i].ReturnType == typeof(void))
-            {
-                //No return type. It can fit a control. 
-                contmethods.Add(methods[i]);
-            }
-            else if (methods[i].GetParameters().Length == 0)
-            {
-                //It has a return, but takes no parameters. It's either a getter or a method made to act like one. 
-                dispmethods.Add(methods[i]);
-            }
-        }
-
-        //Now we've got all the methods that need bindings. 
         //We'll make custom bindings for each - except if the current bindings list already has a binding that matches the name and type. 
         List<DisplayBinding> finaldispbinds = new List<DisplayBinding>();
         List<ControlBinding> finalcontbinds = new List<ControlBinding>();
 
-        //Display first. 
-        foreach(MethodInfo info in dispmethods)
+        //Stop if we don't have a script
+        if (_script != null)
         {
-            bool foundoldmatch = false; 
-            //Check existing bindings for both names and return types. 
-            foreach(DisplayBinding oldbinding in _console.DisplayBindingsList)
+            //Iterate through methods and assign relevant ones to bindings list
+            MethodInfo[] methods = _scriptType.GetMethods(BindingFlags.Instance | BindingFlags.Public);
+            for (int i = 0; i < methods.Length; i++)
             {
-                if(oldbinding.MethodName == info.Name && _scriptType.GetMethod(oldbinding.MethodName).ReturnType == info.ReturnType)
+                //Don't do anything if it's part of MonoBehaviour, because the developer didn't add that. 
+                if (methods[i].DeclaringType.IsAssignableFrom(typeof(MonoBehaviour)))
                 {
-                    //It's a match. Pass in the old one. 
-                    finaldispbinds.Add(oldbinding);
-                    foundoldmatch = true;
-                    break;
+                    continue;
+                }
+
+                //Assign everything into a relevant list, if there is one. 
+                if (methods[i].ReturnType == typeof(void))
+                {
+                    //No return type. It can fit a control. 
+                    contmethods.Add(methods[i]);
+                }
+                else if (methods[i].GetParameters().Length == 0)
+                {
+                    //It has a return, but takes no parameters. It's either a getter or a method made to act like one. 
+                    dispmethods.Add(methods[i]);
                 }
             }
 
-            if(foundoldmatch == false)
-            {
-                DisplayBinding newdisp = new DisplayBinding
-                {
-                    MethodName = info.Name
-                };
+            //Now we've got all the methods that need bindings. 
 
-                finaldispbinds.Add(newdisp);
-            }
-        }
 
-        //Now Control. 
-        foreach(MethodInfo info in contmethods)
-        {
-            bool foundoldmatch = false;
-            ParameterInfo[] newparams = info.GetParameters(); // Caching because we'll compare a lot. 
-            //Check existing bindings for both names and parameters.
-            foreach(ControlBinding oldbinding in _console.ControlBindingsList)
+            //Display first. 
+            foreach (MethodInfo info in dispmethods)
             {
-                if(oldbinding.MethodName == info.Name && _scriptType.GetMethod(oldbinding.MethodName).GetParameters() == newparams)
+                bool foundoldmatch = false;
+                //Check existing bindings for both names and return types. 
+                foreach (DisplayBinding oldbinding in _console.DisplayBindingsList)
                 {
-                    //It's a match. Pass in the old one. 
-                    finalcontbinds.Add(oldbinding);
-                    foundoldmatch = true;
-                    break;
+                    if (oldbinding.MethodName == info.Name && _scriptType.GetMethod(oldbinding.MethodName).ReturnType == info.ReturnType)
+                    {
+                        //It's a match. Pass in the old one. 
+                        finaldispbinds.Add(oldbinding);
+                        foundoldmatch = true;
+                        break;
+                    }
+                }
+
+                if (foundoldmatch == false)
+                {
+                    DisplayBinding newdisp = new DisplayBinding
+                    {
+                        MethodName = info.Name,
+                        TypeString = info.ReturnType.Name
+                    };
+
+                    finaldispbinds.Add(newdisp);
                 }
             }
 
-            if(foundoldmatch == false)
+            //Now Control. 
+            foreach (MethodInfo info in contmethods)
             {
-
-                ControlBinding newcont = new ControlBinding
+                bool foundoldmatch = false;
+                ParameterInfo[] newparams = info.GetParameters(); // Caching because we'll compare a lot. 
+                                                                  //Check existing bindings for both names and parameters.
+                foreach (ControlBinding oldbinding in _console.ControlBindingsList)
                 {
-                    MethodName = info.Name
-                };
-                finalcontbinds.Add(newcont);
-            }
-        }
+                    //if (oldbinding.MethodName == info.Name && _scriptType.GetMethod(oldbinding.MethodName).GetParameters() == newparams)
+                    if (oldbinding.MethodName == info.Name)
+                    {
+                        //The names match. Make sure the parameter types match. 
+                        ParameterInfo[] oldparams = _scriptType.GetMethod(oldbinding.MethodName).GetParameters();
 
+                        if (newparams.Length != oldparams.Length)
+                        {
+                            continue;
+                        }
+
+                        bool foundbadparam = false; 
+                        for (int i = 0; i < newparams.Length; i++)
+                        {
+                            if (newparams[i].ParameterType != oldparams[i].ParameterType)
+                            {
+                                foundbadparam = true;
+                            }
+                        }
+                        if(foundbadparam)
+                        {
+                            continue;
+                        }
+
+
+                        //It's a match. Pass in the old one. 
+                        finalcontbinds.Add(oldbinding);
+                        foundoldmatch = true;
+                        break;
+                    }
+                }
+
+                if (foundoldmatch == false)
+                {
+                    //Make a string that lists the parameters for easy display
+                    string paramstring = "";
+                    for (int i = 0; i < newparams.Length; i++)
+                    {
+                        paramstring += newparams[i].ParameterType.Name;
+                        if (i < newparams.Length - 1)
+                        {
+                            paramstring += ", ";
+                        }
+                    }
+                    ControlBinding newcont = new ControlBinding
+                    {
+                        MethodName = info.Name,
+                        ParamString = paramstring
+                    };
+
+                    finalcontbinds.Add(newcont);
+                }
+            }
+
+        }
         //Replace the console's list with ours. 
         _console.DisplayBindingsList = finaldispbinds;
         _console.ControlBindingsList = finalcontbinds;

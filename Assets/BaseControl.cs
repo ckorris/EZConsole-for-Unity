@@ -3,6 +3,12 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
+/// <summary>
+/// /// All control types inherit from this, but explicitly mention the type. 
+/// Example: "FloatSlider : BaseControl<float>"
+/// </summary>
+/// <typeparam name="T"></typeparam>
+[Serializable]
 public class BaseControl<T> : BaseControl
 {
     public Type ControlType

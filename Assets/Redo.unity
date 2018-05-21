@@ -140,9 +140,41 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c8aa44aa48be95345b5457da0ff0c962, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  ScriptObject: {fileID: 1331763009}
   CompileTimeScript: {fileID: 11500000, guid: 7b5ad8fc737db624284838568e094c80, type: 3}
-  TestDisplay: {fileID: 1329548374}
+  _runtimeScript: {fileID: 1331763010}
+  DisplayBindingsList:
+  - MethodName: get_InheritedBoolProperty
+    Display: {fileID: 0}
+    TypeString: Boolean
+  - MethodName: get_Vector3Property
+    Display: {fileID: 0}
+    TypeString: Vector3
+  - MethodName: get_BoolProperty
+    Display: {fileID: 0}
+    TypeString: Boolean
+  - MethodName: get_FloatProperty
+    Display: {fileID: 1329548374}
+    TypeString: Single
+  ControlBindingsList:
+  - MethodName: set_InheritedBoolProperty
+    Control: {fileID: 0}
+    ParamString: Boolean
+  - MethodName: SomeOneShotMethod
+    Control: {fileID: 0}
+    ParamString: 
+  - MethodName: SetSomeFloatMethod
+    Control: {fileID: 0}
+    ParamString: Single
+  - MethodName: set_BoolProperty
+    Control: {fileID: 0}
+    ParamString: Boolean
+  - MethodName: set_FloatProperty
+    Control: {fileID: 0}
+    ParamString: Single
+  - MethodName: Fire
+    Control: {fileID: 0}
+    ParamString: 
+  TestDisplay: {fileID: 0}
   TestControl: {fileID: 1341661759}
 --- !u!4 &536272782
 Transform:
@@ -155,7 +187,51 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children: []
   m_Father: {fileID: 0}
-  m_RootOrder: 3
+  m_RootOrder: 2
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &873639868
+GameObject:
+  m_ObjectHideFlags: 0
+  m_PrefabParentObject: {fileID: 0}
+  m_PrefabInternal: {fileID: 0}
+  serializedVersion: 5
+  m_Component:
+  - component: {fileID: 873639870}
+  - component: {fileID: 873639869}
+  m_Layer: 0
+  m_Name: Inherited Part Other
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &873639869
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_PrefabParentObject: {fileID: 0}
+  m_PrefabInternal: {fileID: 0}
+  m_GameObject: {fileID: 873639868}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7b5ad8fc737db624284838568e094c80, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  BoolValue: 0
+  FloatValue: 3
+  _floatProperty: 6.5
+  InheritedBoolValue: 1
+--- !u!4 &873639870
+Transform:
+  m_ObjectHideFlags: 0
+  m_PrefabParentObject: {fileID: 0}
+  m_PrefabInternal: {fileID: 0}
+  m_GameObject: {fileID: 873639868}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 6.377918, y: 6.637359, z: -2.8381038}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_RootOrder: 6
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1156140197
 GameObject:
@@ -374,7 +450,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   BoolValue: 0
-  FloatValue: 0
+  FloatValue: 3
   _floatProperty: 5.5
   InheritedBoolValue: 1
 --- !u!4 &1331763011
@@ -388,7 +464,7 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children: []
   m_Father: {fileID: 0}
-  m_RootOrder: 2
+  m_RootOrder: 3
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1341661758
 GameObject:
