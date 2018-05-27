@@ -11,13 +11,6 @@ using UnityEngine;
 [Serializable]
 public class BaseControl<T> : BaseControl
 {
-    public Type ControlType
-    {
-        get
-        {
-            return typeof(T);
-        }
-    }
 
     //protected Action<T> ActionDelegate; //The delegate that gets called when you use the control, bound to a method on the console's target script. (TODO: turn to dictionary by console for removal)
 

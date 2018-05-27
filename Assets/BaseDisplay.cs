@@ -11,14 +11,6 @@ using UnityEngine;
 [Serializable]
 public class BaseDisplay<T> : BaseDisplay
 {
-    public Type DisplayType
-    {
-        get
-        {
-            return typeof(T);
-        }
-    }
-
     /// <summary>
     /// The value that gets retrieved from the Console's component. 
     /// </summary>
