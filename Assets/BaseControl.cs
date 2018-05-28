@@ -46,11 +46,6 @@ public class BaseControl<T> : BaseControl
     /// <param name="value"></param>
     public virtual void ActivateAction(T value)
     {
-        /*if(ActionDelegate != null)
-        {
-            ActionDelegate.Invoke(value);
-        }*/
-
         //Iterate through all bound components
         foreach(List<Action<T>> list in _delegateDictionary.Values)
         {

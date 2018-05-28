@@ -2,12 +2,12 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public class ThrottleHandle : BaseGrabControl<float>
+public class ThrottleHandle : BaseGrabAndPressControl<float>
 {
     // Use this for initialization
-    void Start ()
+    public override void Start ()
     {
-		
+        base.Start();
 	}
 
     // Update is called once per frame

@@ -114,10 +114,10 @@ public class VRHand : VRControllerComponent
                     _currentUsable = _hoveringUsable;
 
                     //Clear the hovering effects, and the reference so that it will get re-hovered when we let go. 
-                    _currentUsable.HoverEnter();
+                    _currentUsable.HoverExit();
                     _hoveringUsable = null;
 
-                    _useState = UseState.Grabbing;
+                    _useState = UseState.Pressing;
 
                 }
             }

@@ -9,6 +9,16 @@ using UnityEngine;
 /// <typeparam name="T"></typeparam>
 public abstract class BaseGrabAndPressControl<T> : BaseControl<T>, IVRGrabbable, IVRPressable
 {
+    private Material _hoverMaterial;
+    private Material[] _startMaterials;
+
+    public virtual void Start()
+    {
+        //Set up materials for hovering
+        _hoverMaterial = Resources.Load("HoveredMat") as Material;
+        _startMaterials = gameObject.GetComponent<MeshRenderer>().materials;
+    }
+
     public GameObject GetGameObject()
     {
         return gameObject;
@@ -20,33 +30,49 @@ public abstract class BaseGrabAndPressControl<T> : BaseControl<T>, IVRGrabbable,
         else return false; 
     }
 
-    public void GrabEnd()
+    public virtual void GrabStart(VRControllerComponent controller)
     {
         throw new System.NotImplementedException();
     }
 
-    public void GrabStart(VRControllerComponent controller)
+    public virtual void GrabEnd()
     {
         throw new System.NotImplementedException();
     }
 
-    public void HoverEnter()
+    public virtual void PressStart(VRControllerComponent controller)
     {
         throw new System.NotImplementedException();
     }
 
-    public void HoverExit()
+    public virtual void PressEnd()
     {
         throw new System.NotImplementedException();
     }
 
-    public void PressEnd()
+    public virtual void HoverEnter()
     {
-        throw new System.NotImplementedException();
+        ApplyHoverMaterials();
     }
 
-    public void PressStart(VRControllerComponent controller)
+    public virtual void HoverExit()
     {
-        throw new System.NotImplementedException();
+        RevertMaterials();
+    }
+
+    public void ApplyHoverMaterials()
+    {
+        MeshRenderer rend = GetComponent<MeshRenderer>();
+        Material[] hovermats = new Material[rend.materials.Length];
+        for (int i = 0; i < hovermats.Length; i++)
+        {
+            hovermats[i] = _hoverMaterial;
+        }
+
+        rend.materials = hovermats;
+    }
+    public void RevertMaterials()
+    {
+        gameObject.GetComponent<MeshRenderer>().materials = _startMaterials;
     }
 }

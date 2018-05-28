@@ -9,6 +9,16 @@ using UnityEngine;
 /// 
 public abstract class BaseGrabControl<T> : BaseControl<T>, IVRGrabbable
 {
+    private Material _hoverMaterial;
+    private Material[] _startMaterials;
+
+    public virtual void Start()
+    {
+        //Set up materials for hovering
+        _hoverMaterial = Resources.Load("HoveredMat") as Material;
+        _startMaterials = gameObject.GetComponent<MeshRenderer>().materials;
+    }
+
     public virtual void GrabStart(VRControllerComponent controller)
     {
         
@@ -32,13 +42,27 @@ public abstract class BaseGrabControl<T> : BaseControl<T>, IVRGrabbable
 
     public virtual void HoverEnter()
     {
-        
+        ApplyHoverMaterials();
     }
 
     public virtual void HoverExit()
     {
-        
+        RevertMaterials();
     }
 
+    public void ApplyHoverMaterials()
+    {
+        MeshRenderer rend = GetComponent<MeshRenderer>();
+        Material[] hovermats = new Material[rend.materials.Length];
+        for (int i = 0; i < hovermats.Length; i++)
+        {
+            hovermats[i] = _hoverMaterial;
+        }
 
+        rend.materials = hovermats;
+    }
+    public void RevertMaterials()
+    {
+        gameObject.GetComponent<MeshRenderer>().materials = _startMaterials;
+    }
 }
