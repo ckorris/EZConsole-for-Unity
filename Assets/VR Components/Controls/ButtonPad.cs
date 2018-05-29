@@ -19,12 +19,10 @@ public class ButtonPad : BasePressControl<bool> //Should be null but you can't d
     public override void PressStart(VRControllerComponent controller)
     {
         base.PressStart(controller);
-        print("Press button!");
     }
 
     public override void PressEnd()
     {
         base.PressEnd();
-        print("Unpress button!");
     }
 }

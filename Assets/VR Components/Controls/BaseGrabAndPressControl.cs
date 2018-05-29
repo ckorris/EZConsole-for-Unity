@@ -32,22 +32,22 @@ public abstract class BaseGrabAndPressControl<T> : BaseControl<T>, IVRGrabbable,
 
     public virtual void GrabStart(VRControllerComponent controller)
     {
-        throw new System.NotImplementedException();
+        
     }
 
     public virtual void GrabEnd()
     {
-        throw new System.NotImplementedException();
+        
     }
 
     public virtual void PressStart(VRControllerComponent controller)
     {
-        throw new System.NotImplementedException();
+        
     }
 
     public virtual void PressEnd()
     {
-        throw new System.NotImplementedException();
+        
     }
 
     public virtual void HoverEnter()
