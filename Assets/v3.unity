@@ -301,6 +301,48 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   CompileTimeScript: {fileID: 11500000, guid: 7b5ad8fc737db624284838568e094c80, type: 3}
   RuntimeScript: {fileID: 0}
+  _bindings:
+  - TargetMethodName: get_InheritedBoolProperty
+    ControlObject: {fileID: 0}
+    ControlComponent: {fileID: 0}
+    ControlDelegateName: 
+  - TargetMethodName: set_InheritedBoolProperty
+    ControlObject: {fileID: 0}
+    ControlComponent: {fileID: 0}
+    ControlDelegateName: 
+  - TargetMethodName: get_Vector3Property
+    ControlObject: {fileID: 0}
+    ControlComponent: {fileID: 0}
+    ControlDelegateName: 
+  - TargetMethodName: SomeOneShotMethod
+    ControlObject: {fileID: 0}
+    ControlComponent: {fileID: 0}
+    ControlDelegateName: 
+  - TargetMethodName: SetSomeFloatMethod
+    ControlObject: {fileID: 0}
+    ControlComponent: {fileID: 0}
+    ControlDelegateName: 
+  - TargetMethodName: get_BoolProperty
+    ControlObject: {fileID: 0}
+    ControlComponent: {fileID: 0}
+    ControlDelegateName: 
+  - TargetMethodName: set_BoolProperty
+    ControlObject: {fileID: 0}
+    ControlComponent: {fileID: 0}
+    ControlDelegateName: 
+  - TargetMethodName: get_FloatProperty
+    ControlObject: {fileID: 0}
+    ControlComponent: {fileID: 0}
+    ControlDelegateName: 
+  - TargetMethodName: set_FloatProperty
+    ControlObject: {fileID: 0}
+    ControlComponent: {fileID: 0}
+    ControlDelegateName: 
+  - TargetMethodName: Fire
+    ControlObject: {fileID: 1742118428}
+    ControlComponent: {fileID: 1742118429}
+    ControlDelegateName: OneShotAction
+  TestList: []
 --- !u!1 &1708092959
 GameObject:
   m_ObjectHideFlags: 0

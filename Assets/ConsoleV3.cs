@@ -8,13 +8,29 @@ using UnityEngine;
 using UnityEditor;
 using System.Linq.Expressions;
 
+[Serializable]
 public class ConsoleV3 : MonoBehaviour
 {
     public MonoScript CompileTimeScript; //For compile-time, and briefly at Start for reflection purposes. 
 
     public Component RuntimeScript; //The script attached to the gameobject from which we actually create the delegates. 
 
+    [SerializeField]
+    private List<EZConsoleBindingStruct> _bindings = new List<EZConsoleBindingStruct>();
+    [SerializeField]
+    public List<EZConsoleBindingStruct> Bindings
+    {
+        get
+        {
+            return _bindings;
+        }
+        set
+        {
+            _bindings = value;
+        }
+    }
 
+    public List<EZConsoleBindingStruct> TestList = new List<EZConsoleBindingStruct>();
 
     // Use this for initialization
     void Start()
@@ -26,6 +42,15 @@ public class ConsoleV3 : MonoBehaviour
     void Update()
     {
 
+    }
+
+    public void SetBindings(List<EZConsoleBindingStruct> inputbinds)
+    {
+        _bindings = new List<EZConsoleBindingStruct>();
+        foreach(EZConsoleBindingStruct sbind in inputbinds)
+        {
+            Bindings.Add(sbind);
+        }
     }
 }
 
@@ -66,15 +91,10 @@ public class ConsoleV3Editor : Editor
 
     MonoScript _lastScript; //Used to check if the current script has changed
 
-    static List<EZConsoleEditorBinding> _editorBindingsList;
+    List<EZConsoleBindingEditor> _editorBindingsList;
 
-    ConsoleV3Editor() //Constructor should be fine because this isn't a MonoBehaviour. We'll see. 
-    {
-        if (_editorBindingsList == null)
-        {
-            //UpdateBindingsList();
-        }
-    }
+    SerializedObject _consoleSerial;
+    SerializedProperty _consoleListSerial;
 
     private void OnEnable()
     {
@@ -86,15 +106,39 @@ public class ConsoleV3Editor : Editor
     {
         DrawDefaultInspector();
 
+        /*if (_console.Bindings != null) //This lets you load between selections but won't you actually update the Console list. 
+        {
+            //_editorBindingsList = MakeEditorBindingList(_console.Bindings);
+        }*/
+
+        if (_editorBindingsList == null || _script != _lastScript)
+        {
+            if (_script != null) //There's a new script, so simply update it
+            {
+                _editorBindingsList = MakeEditorBindingList(_console.Bindings);
+            }
+            else //The new script is empty, so just clear everything. 
+            {
+                //_console.Bindings = new List<EZConsoleBindingStruct>();
+                _console.SetBindings(new List<EZConsoleBindingStruct>());
+
+                _editorBindingsList = new List<EZConsoleBindingEditor>();
+            }
+
+            _lastScript = _script;
+        }
+
         UpdateBindingsList();
 
         //Test for now. List all methods in target script
         if (_script != null)
         {
-            /*MethodInfo[] methods = _scriptType.GetMethods(BindingFlags.Instance | BindingFlags.Public)
-                .Where(x => !x.DeclaringType.IsAssignableFrom(typeof(MonoBehaviour)))
-                .ToArray();
-                */
+
+            //Testing reorderable list
+            //UnityEditorInternal.ReorderableList reorderablelist = new UnityEditorInternal.ReorderableList(_editorBindingsList, typeof(EZConsoleBindingEditor));
+            //reorderablelist.DoLayoutList();
+
+
 
             for (int i = 0; i < _editorBindingsList.Count; i++)
             {
@@ -108,11 +152,11 @@ public class ConsoleV3Editor : Editor
                 //Make an array of types that include parameter types, with one at the end that represents the return type. 
                 //This will get used to find the delegate type we'll need, and follows the format required by Func. 
                 Type[] paramtypes = new Type[paraminfos.Length];
-                for(int p = 0; p < paraminfos.Length; p++)
+                for (int p = 0; p < paraminfos.Length; p++)
                 {
                     paramtypes[p] = paraminfos[p].ParameterType;
                 }
-                
+
                 //Get the type of delegate that we'll need to assign to this. 
                 Type deltype;
 
@@ -128,14 +172,25 @@ public class ConsoleV3Editor : Editor
                     deltype = Expression.GetFuncType(paramtypes);
                 }
 
-                //Debug.Log(_editorBindingsList[i].TargetMethod + " needs a delegate of type " + deltype);
-
                 //Draw the box
                 EditorGUILayout.BeginHorizontal();
 
                 _editorBindingsList[i].ControlObject = (GameObject)EditorGUILayout.ObjectField(_editorBindingsList[i].ControlObject, typeof(UnityEngine.Object), true);
                 EditorGUI.BeginDisabledGroup(_editorBindingsList[i].ControlObject == null);
-                GUIContent dropdowncontent = new GUIContent(_editorBindingsList[i].ControlDelegateName != null ? _editorBindingsList[i].ControlDelegateName : "No Function");
+
+                //Give a name to the label
+                string emptylabel;
+                if (_editorBindingsList[i].ControlDelegateName == "" || _editorBindingsList[i].ControlDelegateName == null)
+                {
+                    emptylabel = "No Function";
+                }
+                else
+                {
+                    emptylabel = _editorBindingsList[i].ControlDelegateName;
+                }
+                GUIContent dropdowncontent = new GUIContent(emptylabel);
+
+
                 if (EditorGUILayout.DropdownButton(dropdowncontent, FocusType.Keyboard))
                 {
                     GenericMenu menu = new GenericMenu();
@@ -144,6 +199,7 @@ public class ConsoleV3Editor : Editor
                     MenuSelectComponent emptymsc = new MenuSelectComponent()
                     {
                         binding = _editorBindingsList[i],
+                        bindobject = _editorBindingsList[i].ControlObject,
                         component = null
                     };
                     menu.AddItem(new GUIContent("No Component"), _editorBindingsList[i].ControlComponent == null, SelectFunction, emptymsc);
@@ -167,6 +223,7 @@ public class ConsoleV3Editor : Editor
                             {
                                 binding = _editorBindingsList[i],
                                 component = components[j],
+                                bindobject = _editorBindingsList[i].ControlObject,
                                 delegatename = t.Name
                             };
 
@@ -175,7 +232,7 @@ public class ConsoleV3Editor : Editor
 
                         }
                     }
-                                           
+
 
                     menu.ShowAsContext();
                 }
@@ -183,6 +240,10 @@ public class ConsoleV3Editor : Editor
                 EditorGUILayout.EndHorizontal();
 
             }
+
+            //_console.Bindings = MakeSerializableBindingList(_editorBindingsList);
+            _console.SetBindings(MakeSerializableBindingList(_editorBindingsList));
+
         }
     }
 
@@ -203,23 +264,26 @@ public class ConsoleV3Editor : Editor
         MenuSelectComponent msc = (MenuSelectComponent)menuselectcomponent;
 
         msc.binding.ControlComponent = msc.component;
+        msc.binding.ControlObject = msc.bindobject;
         msc.binding.ControlDelegateName = msc.delegatename;
     }
 
     struct MenuSelectComponent
     {
-        public EZConsoleEditorBinding binding;
+        public EZConsoleBindingEditor binding;
+        public GameObject bindobject;
         public Component component;
         public string delegatename;
     }
 
+    /// <summary>
+    /// Checks the list of bindings against what methods the script has. This preserves old but valid bindings while removing ones that are no longer needed. 
+    /// </summary>
     private void UpdateBindingsList()
     {
-        //Debug.Log(_editorBindingsList == null ? "Bindings List is null" : _editorBindingsList.Count.ToString());
-
         if (_script != null)
         {
-            List<EZConsoleEditorBinding> newbindings = new List<EZConsoleEditorBinding>();
+            List<EZConsoleBindingEditor> newbindings = new List<EZConsoleBindingEditor>();
 
             ConsoleV3 targetconsole = (ConsoleV3)target;
             MethodInfo[] methods = _scriptType.GetMethods(BindingFlags.Instance | BindingFlags.Public)
@@ -232,9 +296,9 @@ public class ConsoleV3Editor : Editor
                 if (_editorBindingsList != null)
                 {
                     bool foundoldbinding = false;
-                    foreach (EZConsoleEditorBinding oldbinding in _editorBindingsList)
+                    foreach (EZConsoleBindingEditor oldbinding in _editorBindingsList)
                     {
-                        if (oldbinding.TargetMethod.Name == methods[i].Name)
+                        if (oldbinding.TargetMethod != null && oldbinding.TargetMethod.Name == methods[i].Name)
                         {
                             //We found an old one. Add that one and not the new one. 
                             newbindings.Add(oldbinding);
@@ -250,14 +314,65 @@ public class ConsoleV3Editor : Editor
                 }
 
                 //If we didn't find an old one, make a new one. 
-                EZConsoleEditorBinding binding = new EZConsoleEditorBinding();
+                EZConsoleBindingEditor binding = new EZConsoleBindingEditor();
                 binding.TargetMethod = methods[i];
 
                 newbindings.Add(binding);
             }
 
             _editorBindingsList = newbindings;
+
         }
+    }
+
+    /// <summary>
+    /// Since EZConsoleEditorBindings is more useful but not serializable, this turns a list of them into the serializable EZConsoleBinding
+    /// </summary>
+    /// <param name="editorbindings"></param>
+    /// <returns></returns>
+    public List<EZConsoleBindingStruct> MakeSerializableBindingList(List<EZConsoleBindingEditor> editorbindings)
+    {
+        List<EZConsoleBindingStruct> sbindings = new List<EZConsoleBindingStruct>();
+
+        foreach (EZConsoleBindingEditor ebind in editorbindings)
+        {
+            EZConsoleBindingStruct sbind = new EZConsoleBindingStruct()
+            {
+                TargetMethodName = ebind.TargetMethod.Name,
+                ControlObject = ebind.ControlObject,
+                ControlComponent = ebind.ControlComponent, //SHOOOULD be serializable but we'll see. 
+                ControlDelegateName = ebind.ControlDelegateName
+            };
+
+            sbindings.Add(sbind);
+        }
+
+        return sbindings;
+    }
+
+    /// <summary>
+    /// Turns the serializable bindings list from the console into the more useful EZConsoleBindingEditor. 
+    /// </summary>
+    /// <param name="serialbindings"></param>
+    /// <returns></returns>
+    public List<EZConsoleBindingEditor> MakeEditorBindingList(List<EZConsoleBindingStruct> serialbindings)
+    {
+        List<EZConsoleBindingEditor> ebindings = new List<EZConsoleBindingEditor>();
+
+        foreach (EZConsoleBindingStruct sbind in serialbindings)
+        {
+            EZConsoleBindingEditor ebind = new EZConsoleBindingEditor()
+            {
+                TargetMethod = _scriptType.GetMethod(sbind.TargetMethodName),
+                ControlObject = sbind.ControlObject != null ? sbind.ControlObject : null,
+                ControlComponent = sbind.ControlComponent != null ? sbind.ControlComponent : null,
+                ControlDelegateName = sbind.ControlDelegateName
+            };
+
+            ebindings.Add(ebind);
+        }
+
+        return ebindings;
     }
 }
 
@@ -265,12 +380,28 @@ public class ConsoleV3Editor : Editor
 /// In the editor, holds bindings between the target script and the objects that connect to the methods, in the editor.
 /// Note that it's not fully serializable, so it can't be passed directly to the Console object. 
 /// </summary>
-[Serializable]
-public class EZConsoleEditorBinding
+public class EZConsoleBindingEditor
 {
     public MethodInfo TargetMethod; //The method on the target script we'll bind to
     public GameObject ControlObject; //The gameobject that has the delegate we'll bind to the method
     public Component ControlComponent; //The specific component with the delegate we'll bind
     public string ControlDelegateName; //The name of the delegate we'll bind. Using a string so we can call reflection later. 
+}
+
+/// <summary>
+/// Holds bindings between a target method and the delegates that will invoke it. 
+/// Limited in functionality because it needs to be serializable - The editor and console will need to use reflection to use. 
+/// </summary>
+[Serializable]
+public class EZConsoleBindingStruct
+{
+    [SerializeField]
+    public string TargetMethodName; //Use GetMethod to interpret
+    [SerializeField]
+    public GameObject ControlObject;
+    [SerializeField]
+    public Component ControlComponent; //Reference to the controlling component
+    [SerializeField]
+    public string ControlDelegateName; //Use GetField and cast with Expression.GetActionType or GetFunctionType to interpret
 
 }
