@@ -13,7 +13,7 @@ public class Console : MonoBehaviour
     [SerializeField]
     public MonoScript CompileTimeScript; //For compile-time, and briefly at Start for reflection purposes. 
     [SerializeField]
-    private Component _runtimeScript;//The script attached to the gameobject from which we actually create the delegates. 
+    private Component _runtimeScript; //The script attached to the gameobject from which we actually create the delegates. 
     public Component RuntimeScript
     {
         get
