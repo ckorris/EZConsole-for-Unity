@@ -3,10 +3,12 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Linq;
+using System.Linq.Expressions;
 
 using UnityEngine;
 using UnityEditor;
-using System.Linq.Expressions;
+using UnityEditorInternal;
+
 
 [Serializable]
 public class ConsoleV3 : MonoBehaviour
@@ -16,9 +18,9 @@ public class ConsoleV3 : MonoBehaviour
     public Component RuntimeScript; //The script attached to the gameobject from which we actually create the delegates. 
 
     [SerializeField]
-    private List<EZConsoleBindingStruct> _bindings = new List<EZConsoleBindingStruct>();
+    private List<EZConsoleBindingSerial> _bindings = new List<EZConsoleBindingSerial>();
     [SerializeField]
-    public List<EZConsoleBindingStruct> Bindings
+    public List<EZConsoleBindingSerial> Bindings
     {
         get
         {
@@ -29,8 +31,6 @@ public class ConsoleV3 : MonoBehaviour
             _bindings = value;
         }
     }
-
-    public List<EZConsoleBindingStruct> TestList = new List<EZConsoleBindingStruct>();
 
     // Use this for initialization
     void Start()
@@ -44,10 +44,10 @@ public class ConsoleV3 : MonoBehaviour
 
     }
 
-    public void SetBindings(List<EZConsoleBindingStruct> inputbinds)
+    public void SetBindings(List<EZConsoleBindingSerial> inputbinds)
     {
-        _bindings = new List<EZConsoleBindingStruct>();
-        foreach(EZConsoleBindingStruct sbind in inputbinds)
+        _bindings = new List<EZConsoleBindingSerial>();
+        foreach (EZConsoleBindingSerial sbind in inputbinds)
         {
             Bindings.Add(sbind);
         }
@@ -94,9 +94,6 @@ public class ConsoleV3Editor : Editor
     //List<EZConsoleBindingEditor> _editorBindingsList;
     Dictionary<MethodInfo, List<EZConsoleBindingEditor>> _editorBindingsList;
 
-    SerializedObject _consoleSerial;
-    SerializedProperty _consoleListSerial;
-
     private void OnEnable()
     {
         _console = (ConsoleV3)target;
@@ -120,8 +117,7 @@ public class ConsoleV3Editor : Editor
             }
             else //The new script is empty, so just clear everything. 
             {
-                //_console.Bindings = new List<EZConsoleBindingStruct>();
-                _console.SetBindings(new List<EZConsoleBindingStruct>());
+                _console.SetBindings(new List<EZConsoleBindingSerial>());
 
                 _editorBindingsList = new Dictionary<MethodInfo, List<EZConsoleBindingEditor>>();
             }
@@ -134,64 +130,81 @@ public class ConsoleV3Editor : Editor
         //Test for now. List all methods in target script
         if (_script != null)
         {
-
-            //Testing reorderable list
-            //UnityEditorInternal.ReorderableList reorderablelist = new UnityEditorInternal.ReorderableList(_editorBindingsList, typeof(EZConsoleBindingEditor));
-            //reorderablelist.DoLayoutList();
-
+            //Go through each method and draw the list of bindings. 
             foreach (MethodInfo minfo in _editorBindingsList.Keys)
             {
-                //Draw the list of EZConsoleBindingEditors as a reorderable list and add proper callbacks
-                UnityEditorInternal.ReorderableList reorderablelist = new UnityEditorInternal.ReorderableList(_editorBindingsList[minfo], typeof(EZConsoleBindingEditor));
+                //Find the parameters and return type of the target method
+                Type returntype = minfo.ReturnType;
+                ParameterInfo[] paraminfos = minfo.GetParameters();
 
-
-                for (int i = 0; i < _editorBindingsList[minfo].Count; i++)
+                //Make an array of types that include parameter types, with one at the end that represents the return type. 
+                //This will get used to find the delegate type we'll need, and follows the format required by Func. 
+                Type[] paramtypes = new Type[paraminfos.Length];
+                for (int p = 0; p < paraminfos.Length; p++)
                 {
+                    paramtypes[p] = paraminfos[p].ParameterType;
+                }
 
-                    EditorGUILayout.LabelField(_editorBindingsList[i].TargetMethod.Name, EditorStyles.boldLabel); //Title
+                //Get the type of delegate that we'll need to assign to this. 
+                Type deltype;
+                if (returntype == typeof(void)) //Action type
+                {
+                    deltype = Expression.GetActionType(paramtypes);
+                }
+                else //Func type
+                {
+                    Array.Resize(ref paramtypes, paramtypes.Length + 1);
+                    paramtypes[paramtypes.Length - 1] = returntype;
 
-                    //Find the parameters and return type of the target method
-                    Type returntype = _editorBindingsList[i].TargetMethod.ReturnType;
-                    ParameterInfo[] paraminfos = _editorBindingsList[i].TargetMethod.GetParameters();
+                    deltype = Expression.GetFuncType(paramtypes);
+                }
 
-                    //Make an array of types that include parameter types, with one at the end that represents the return type. 
-                    //This will get used to find the delegate type we'll need, and follows the format required by Func. 
-                    Type[] paramtypes = new Type[paraminfos.Length];
-                    for (int p = 0; p < paraminfos.Length; p++)
-                    {
-                        paramtypes[p] = paraminfos[p].ParameterType;
-                    }
+                //Draw the list of EZConsoleBindingEditors as a reorderable list and add proper callbacks
+                ReorderableList reorderablelist = new ReorderableList(_editorBindingsList[minfo], typeof(EZConsoleBindingEditor));
 
-                    //Get the type of delegate that we'll need to assign to this. 
-                    Type deltype;
+                //Add label to the header
+                reorderablelist.drawHeaderCallback = (Rect rect) => 
+                {
+                    EditorGUI.LabelField(rect, minfo.Name, EditorStyles.boldLabel);
+                };
 
-                    if (returntype == typeof(void)) //Action type
-                    {
-                        deltype = Expression.GetActionType(paramtypes);
-                    }
-                    else //Func type
-                    {
-                        Array.Resize(ref paramtypes, paramtypes.Length + 1);
-                        paramtypes[paramtypes.Length - 1] = returntype;
+                //Button to add to the list works by default but not to delete them. Add callback for that. 
+                reorderablelist.onRemoveCallback = (ReorderableList rlist) =>
+                {
+                    rlist.list.RemoveAt(rlist.count - 1);
+                    //rlist.list.Clear();
+                    Debug.Log("Remove called");
+                };
 
-                        deltype = Expression.GetFuncType(paramtypes);
-                    }
+                reorderablelist.onCanRemoveCallback = (ReorderableList rlist) => { return true; };
 
+                //We need to subscribe a draw function to drawElementCallback, but I can't pass the list to it. Or can I? 
+                reorderablelist.drawElementCallback += (Rect rect, int index, bool isActive, bool isFocused) =>
+                {
+                    //SCREW THE RULES I'VE GOT LAMBDA
+                    DrawBindingInList(_editorBindingsList[minfo], minfo, deltype, rect, index, isActive, isFocused);
+                };
+                reorderablelist.DoLayoutList();
+
+                #region Old Binding Set Code 
+                //Will delete after the next commit
+                /*for (int i = 0; i < _editorBindingsList[minfo].Count; i++)
+                {
                     //Draw the box
                     EditorGUILayout.BeginHorizontal();
 
-                    _editorBindingsList[i].ControlObject = (GameObject)EditorGUILayout.ObjectField(_editorBindingsList[i].ControlObject, typeof(UnityEngine.Object), true);
-                    EditorGUI.BeginDisabledGroup(_editorBindingsList[i].ControlObject == null);
+                    _editorBindingsList[minfo][i].ControlObject = (GameObject)EditorGUILayout.ObjectField(_editorBindingsList[minfo][i].ControlObject, typeof(UnityEngine.Object), true);
+                    EditorGUI.BeginDisabledGroup(_editorBindingsList[minfo][i].ControlObject == null);
 
                     //Give a name to the label
                     string emptylabel;
-                    if (_editorBindingsList[i].ControlDelegateName == "" || _editorBindingsList[i].ControlDelegateName == null)
+                    if (_editorBindingsList[minfo][i].ControlDelegateName == "" || _editorBindingsList[minfo][i].ControlDelegateName == null)
                     {
                         emptylabel = "No Function";
                     }
                     else
                     {
-                        emptylabel = _editorBindingsList[i].ControlDelegateName;
+                        emptylabel = _editorBindingsList[minfo][i].ControlDelegateName;
                     }
                     GUIContent dropdowncontent = new GUIContent(emptylabel);
 
@@ -203,16 +216,16 @@ public class ConsoleV3Editor : Editor
                         //Add the "No Component" option
                         MenuSelectComponent emptymsc = new MenuSelectComponent()
                         {
-                            binding = _editorBindingsList[i],
-                            bindobject = _editorBindingsList[i].ControlObject,
+                            binding = _editorBindingsList[minfo][i],
+                            bindobject = _editorBindingsList[minfo][i].ControlObject,
                             component = null
                         };
-                        menu.AddItem(new GUIContent("No Component"), _editorBindingsList[i].ControlComponent == null, SelectFunction, emptymsc);
+                        menu.AddItem(new GUIContent("No Component"), _editorBindingsList[minfo][i].ControlComponent == null, SelectFunction, emptymsc);
 
                         menu.AddSeparator("");
 
                         //List all components
-                        Component[] components = _editorBindingsList[i].ControlObject.GetComponents<Component>();
+                        Component[] components = _editorBindingsList[minfo][i].ControlObject.GetComponents<Component>();
                         for (int j = 0; j < components.Length; j++)
                         {
                             //List all delegates in the control, which includes actions, functions, etc. 
@@ -226,14 +239,14 @@ public class ConsoleV3Editor : Editor
                             {
                                 MenuSelectComponent msc = new MenuSelectComponent()
                                 {
-                                    binding = _editorBindingsList[i],
+                                    binding = _editorBindingsList[minfo][i],
                                     component = components[j],
-                                    bindobject = _editorBindingsList[i].ControlObject,
+                                    bindobject = _editorBindingsList[minfo][i].ControlObject,
                                     delegatename = t.Name
                                 };
 
                                 string path = components[j].GetType().Name + "/" + t.Name;
-                                menu.AddItem(new GUIContent(path), _editorBindingsList[i].ControlComponent == components[j], SelectFunction, msc);
+                                menu.AddItem(new GUIContent(path), _editorBindingsList[minfo][i].ControlComponent == components[j], SelectFunction, msc);
 
                             }
                         }
@@ -244,14 +257,88 @@ public class ConsoleV3Editor : Editor
                     EditorGUI.EndDisabledGroup();
                     EditorGUILayout.EndHorizontal();
 
-                }
+                }*/
+                #endregion
 
             }
 
-            //_console.Bindings = MakeSerializableBindingList(_editorBindingsList);
             _console.SetBindings(MakeSerializableBindingList(_editorBindingsList));
 
         }
+    }
+
+    public void DrawBindingInList(List<EZConsoleBindingEditor> list, MethodInfo minfo, Type deltype, Rect rect, int index, bool isActive, bool isFocused)
+    {
+        EditorGUI.LabelField(rect, index.ToString());
+
+        //Draw the box
+        EditorGUILayout.BeginHorizontal();
+
+
+        Rect controlobjectrect = new Rect(rect.x, rect.y, rect.width / 2, EditorGUIUtility.singleLineHeight);
+        _editorBindingsList[minfo][index].ControlObject = (GameObject)EditorGUI.ObjectField(controlobjectrect, _editorBindingsList[minfo][index].ControlObject, typeof(UnityEngine.Object), true);
+        EditorGUI.BeginDisabledGroup(_editorBindingsList[minfo][index].ControlObject == null);
+
+        //Give a name to the label
+        string emptylabel;
+        if (_editorBindingsList[minfo][index].ControlDelegateName == "" || _editorBindingsList[minfo][index].ControlDelegateName == null)
+        {
+            emptylabel = "No Function";
+        }
+        else
+        {
+            emptylabel = _editorBindingsList[minfo][index].ControlDelegateName;
+        }
+        GUIContent dropdowncontent = new GUIContent(emptylabel);
+
+        Rect dropdownrect = new Rect(rect.x + rect.width / 2, rect.y, rect.width / 2, EditorGUIUtility.singleLineHeight);
+        if (EditorGUI.DropdownButton(dropdownrect, dropdowncontent, FocusType.Keyboard))
+        {
+            GenericMenu menu = new GenericMenu();
+
+            //Add the "No Component" option
+            MenuSelectComponent emptymsc = new MenuSelectComponent()
+            {
+                binding = _editorBindingsList[minfo][index],
+                bindobject = _editorBindingsList[minfo][index].ControlObject,
+                component = null
+            };
+            menu.AddItem(new GUIContent("No Component"), _editorBindingsList[minfo][index].ControlComponent == null, SelectFunction, emptymsc);
+
+            menu.AddSeparator("");
+
+            //List all components
+            Component[] components = _editorBindingsList[minfo][index].ControlObject.GetComponents<Component>();
+            for (int j = 0; j < components.Length; j++)
+            {
+                //List all delegates in the control, which includes actions, functions, etc. 
+                List<FieldInfo> fieldinfos = components[j].GetType().GetFields(BindingFlags.Public | BindingFlags.Instance)
+                    .Where(t => t.FieldType.IsAssignableFrom(deltype))
+                    .ToList();
+
+
+                //Debug.Log(meminfos.Count);
+                foreach (FieldInfo t in fieldinfos)
+                {
+                    MenuSelectComponent msc = new MenuSelectComponent()
+                    {
+                        binding = _editorBindingsList[minfo][index],
+                        component = components[j],
+                        bindobject = _editorBindingsList[minfo][index].ControlObject,
+                        delegatename = t.Name
+                    };
+
+                    string path = components[j].GetType().Name + "/" + t.Name;
+                    menu.AddItem(new GUIContent(path), _editorBindingsList[minfo][index].ControlComponent == components[j], SelectFunction, msc);
+
+                }
+            }
+
+
+            menu.ShowAsContext();
+        }
+        EditorGUI.EndDisabledGroup();
+        EditorGUILayout.EndHorizontal();
     }
 
     /// <summary>
@@ -290,45 +377,26 @@ public class ConsoleV3Editor : Editor
     {
         if (_script != null)
         {
-            List<EZConsoleBindingEditor> newbindings = new List<EZConsoleBindingEditor>();
+            Dictionary<MethodInfo, List<EZConsoleBindingEditor>> newbindings = new Dictionary<MethodInfo, List<EZConsoleBindingEditor>>();
 
             ConsoleV3 targetconsole = (ConsoleV3)target;
             MethodInfo[] methods = _scriptType.GetMethods(BindingFlags.Instance | BindingFlags.Public)
                 .Where(x => !x.DeclaringType.IsAssignableFrom(typeof(MonoBehaviour)))
                 .ToArray();
 
-            for (int i = 0; i < methods.Length; i++)
+            for (int i = 0; i < methods.Length; i++) //Iterate through methodinfos from the script as of now. 
             {
-                //If the binding exists in the list, add that one instead. 
-                if (_editorBindingsList != null)
+                if (_editorBindingsList.ContainsKey(methods[i])) //The editorbindingslist had a list of bindings, so use that one. 
                 {
-                    bool foundoldbinding = false;
-                    foreach (EZConsoleBindingEditor oldbinding in _editorBindingsList)
-                    {
-                        if (oldbinding.TargetMethod != null && oldbinding.TargetMethod.Name == methods[i].Name)
-                        {
-                            //We found an old one. Add that one and not the new one. 
-                            newbindings.Add(oldbinding);
-                            foundoldbinding = true;
-                            break; //Don't bother going further
-                        }
-                    }
-
-                    if (foundoldbinding)
-                    {
-                        continue;
-                    }
+                    newbindings.Add(methods[i], _editorBindingsList[methods[i]]);
                 }
-
-                //If we didn't find an old one, make a new one. 
-                EZConsoleBindingEditor binding = new EZConsoleBindingEditor();
-                binding.TargetMethod = methods[i];
-
-                newbindings.Add(binding);
+                else //The binding list doesn't have that method, so add a new empty one. 
+                {
+                    newbindings.Add(methods[i], new List<EZConsoleBindingEditor>());
+                }
             }
 
             _editorBindingsList = newbindings;
-
         }
     }
 
@@ -337,15 +405,15 @@ public class ConsoleV3Editor : Editor
     /// </summary>
     /// <param name="editorbindings"></param>
     /// <returns></returns>
-    public List<EZConsoleBindingStruct> MakeSerializableBindingList(Dictionary<MethodInfo, List<EZConsoleBindingEditor>> editorbindings)
+    public List<EZConsoleBindingSerial> MakeSerializableBindingList(Dictionary<MethodInfo, List<EZConsoleBindingEditor>> editorbindings)
     {
-        List<EZConsoleBindingStruct> sbindings = new List<EZConsoleBindingStruct>();
+        List<EZConsoleBindingSerial> sbindings = new List<EZConsoleBindingSerial>();
 
         foreach (MethodInfo minfokey in editorbindings.Keys)
         {
             foreach (EZConsoleBindingEditor ebind in editorbindings[minfokey])
             {
-                EZConsoleBindingStruct sbind = new EZConsoleBindingStruct()
+                EZConsoleBindingSerial sbind = new EZConsoleBindingSerial()
                 {
                     TargetMethodName = minfokey.Name,
                     ControlObject = ebind.ControlObject,
@@ -365,18 +433,18 @@ public class ConsoleV3Editor : Editor
     /// </summary>
     /// <param name="serialbindings"></param>
     /// <returns></returns>
-    public Dictionary<MethodInfo, List<EZConsoleBindingEditor>> MakeEditorBindingList(List<EZConsoleBindingStruct> serialbindings)
+    public Dictionary<MethodInfo, List<EZConsoleBindingEditor>> MakeEditorBindingList(List<EZConsoleBindingSerial> serialbindings)
     {
         //List<EZConsoleBindingEditor> ebindings = new List<EZConsoleBindingEditor>();
         Dictionary<MethodInfo, List<EZConsoleBindingEditor>> ebindings = new Dictionary<MethodInfo, List<EZConsoleBindingEditor>>();
 
-        foreach (EZConsoleBindingStruct sbind in serialbindings)
+        foreach (EZConsoleBindingSerial sbind in serialbindings)
         {
             //If we don't already have a key for that methodinfo, add it. 
             //Iterating through the list of keys and checking for a name, because to check if the MethodInfo exists would result in needless reflection calls. 
-            MethodInfo minfokey = ebindings.Keys.First(m => m.Name == sbind.TargetMethodName);
+            MethodInfo minfokey = ebindings.Keys.FirstOrDefault(m => m.Name == sbind.TargetMethodName);
 
-            if(minfokey == null)
+            if (minfokey == null)
             {
                 MethodInfo newminfo = _scriptType.GetMethod(sbind.TargetMethodName);
                 ebindings.Add(newminfo, new List<EZConsoleBindingEditor>());
@@ -415,7 +483,7 @@ public class EZConsoleBindingEditor
 /// Limited in functionality because it needs to be serializable - The editor and console will need to use reflection to use. 
 /// </summary>
 [Serializable]
-public class EZConsoleBindingStruct
+public class EZConsoleBindingSerial
 {
     [SerializeField]
     public string TargetMethodName; //Use GetMethod to interpret
