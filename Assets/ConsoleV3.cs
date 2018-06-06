@@ -134,7 +134,7 @@ public class ConsoleV3Editor : Editor
             foreach (MethodInfo minfo in _editorBindingsList.Keys)
             {
                 //More tests
-                if (_editorBindingsList.Keys.ElementAt(0) != minfo) continue;
+                //if (_editorBindingsList.Keys.ElementAt(0) != minfo) continue;
 
                 //Find the parameters and return type of the target method
                 Type returntype = minfo.ReturnType;
@@ -171,133 +171,22 @@ public class ConsoleV3Editor : Editor
                     EditorGUI.LabelField(rect, minfo.Name, EditorStyles.boldLabel);
                 };
 
-                reorderablelist.onAddCallback = (ReorderableList rlist) => //For debugging
-                {
-                    Debug.Log("Add");
-                    //rlist.index = rlist.count;
-                    Debug.Log(rlist.index);
-                    ReorderableList.defaultBehaviours.DoAddButton(rlist);
-                    //ReorderableList.defaultBehaviours.DoRemoveButton(rlist);
-
-                    Debug.Log("Index: " + rlist.index + " Count: " + rlist.count + " Can call: " + rlist.onCanRemoveCallback.Invoke(rlist));
-                };
-
-                //Button to add to the list works by default but not to delete them. Add callback for that. 
-                reorderablelist.onRemoveCallback = (ReorderableList rlist) =>
-                {
-                    Debug.Log("Remove called - " + rlist.index);
-                    //ReorderableList.defaultBehaviours.DoRemoveButton(rlist);
-                    //rlist.list.RemoveAt(rlist.count - 1);
-                    //rlist.list.Clear();
-                    
-                };
-
                 reorderablelist.onCanRemoveCallback = (ReorderableList rlist) => 
                 {
                     //Debug.Log("Index: "  + rlist.index + " Count: " + rlist.count + "Can call: " + rlist.onCanRemoveCallback.Invoke(rlist));
                     return rlist.count > 0;
-                    
                 };
 
                 //We need to subscribe a draw function to drawElementCallback, but I can't pass the list to it. Or can I? 
-                reorderablelist.drawElementCallback += (Rect rect, int index, bool isActive, bool isFocused) =>
+                reorderablelist.drawElementCallback = (Rect rect, int index, bool isActive, bool isFocused) =>
                 {
                     //SCREW THE RULES I'VE GOT LAMBDA
                     DrawBindingInList(_editorBindingsList[minfo], minfo, deltype, rect, index, isActive, isFocused);
                 };
 
-                //reorderablelist.onRemoveCallback.Invoke(reorderablelist);
 
-                //Add selection 
-                reorderablelist.onSelectCallback = (ReorderableList rlist) =>
-                {
-                    //EZConsoleBindingEditor selectobject = rlist.serializedProperty.GetArrayElementAtIndex(rlist.index).
-                    Debug.Log("Selected");
-                };
-
-                //Drawing my own footer for debugging
-                reorderablelist.drawFooterCallback = (Rect rect) => 
-                {
-                    reorderablelist.index = reorderablelist.count - 1;
-                    //ReorderableList.defaultBehaviours.DrawFooter(rect, reorderablelist);
-                    DrawFooter(rect, reorderablelist);
-                } ;
-                //reorderablelist.index = reorderablelist.count;
+                reorderablelist.index = reorderablelist.count - 1;
                 reorderablelist.DoLayoutList();
-
-                #region Old Binding Set Code 
-                //Will delete after the next commit
-                /*for (int i = 0; i < _editorBindingsList[minfo].Count; i++)
-                {
-                    //Draw the box
-                    EditorGUILayout.BeginHorizontal();
-
-                    _editorBindingsList[minfo][i].ControlObject = (GameObject)EditorGUILayout.ObjectField(_editorBindingsList[minfo][i].ControlObject, typeof(UnityEngine.Object), true);
-                    EditorGUI.BeginDisabledGroup(_editorBindingsList[minfo][i].ControlObject == null);
-
-                    //Give a name to the label
-                    string emptylabel;
-                    if (_editorBindingsList[minfo][i].ControlDelegateName == "" || _editorBindingsList[minfo][i].ControlDelegateName == null)
-                    {
-                        emptylabel = "No Function";
-                    }
-                    else
-                    {
-                        emptylabel = _editorBindingsList[minfo][i].ControlDelegateName;
-                    }
-                    GUIContent dropdowncontent = new GUIContent(emptylabel);
-
-
-                    if (EditorGUILayout.DropdownButton(dropdowncontent, FocusType.Keyboard))
-                    {
-                        GenericMenu menu = new GenericMenu();
-
-                        //Add the "No Component" option
-                        MenuSelectComponent emptymsc = new MenuSelectComponent()
-                        {
-                            binding = _editorBindingsList[minfo][i],
-                            bindobject = _editorBindingsList[minfo][i].ControlObject,
-                            component = null
-                        };
-                        menu.AddItem(new GUIContent("No Component"), _editorBindingsList[minfo][i].ControlComponent == null, SelectFunction, emptymsc);
-
-                        menu.AddSeparator("");
-
-                        //List all components
-                        Component[] components = _editorBindingsList[minfo][i].ControlObject.GetComponents<Component>();
-                        for (int j = 0; j < components.Length; j++)
-                        {
-                            //List all delegates in the control, which includes actions, functions, etc. 
-                            List<FieldInfo> fieldinfos = components[j].GetType().GetFields(BindingFlags.Public | BindingFlags.Instance)
-                                .Where(t => t.FieldType.IsAssignableFrom(deltype))
-                                .ToList();
-
-
-                            //Debug.Log(meminfos.Count);
-                            foreach (FieldInfo t in fieldinfos)
-                            {
-                                MenuSelectComponent msc = new MenuSelectComponent()
-                                {
-                                    binding = _editorBindingsList[minfo][i],
-                                    component = components[j],
-                                    bindobject = _editorBindingsList[minfo][i].ControlObject,
-                                    delegatename = t.Name
-                                };
-
-                                string path = components[j].GetType().Name + "/" + t.Name;
-                                menu.AddItem(new GUIContent(path), _editorBindingsList[minfo][i].ControlComponent == components[j], SelectFunction, msc);
-
-                            }
-                        }
-
-
-                        menu.ShowAsContext();
-                    }
-                    EditorGUI.EndDisabledGroup();
-                    EditorGUILayout.EndHorizontal();
-
-                }*/
-                #endregion
 
             }
 
@@ -378,79 +267,6 @@ public class ConsoleV3Editor : Editor
         }
         EditorGUI.EndDisabledGroup();
         EditorGUILayout.EndHorizontal();
-    }
-
-    /// <summary>
-    /// This is the decompiled DrawFooter function of ReorderableList for debugging. 
-    /// </summary>
-    /// <param name="rect"></param>
-    /// <param name="rlist"></param>
-    public void DrawFooter(Rect rect, ReorderableList rlist)
-    {
-        //Debug.Log("Drawing footer");
-        ReorderableList.Defaults defaults = new ReorderableList.Defaults();
-
-        float xMax = rect.xMax;
-        float num = xMax - 8f;
-        if (rlist.displayAdd)
-        {
-            num -= 25f;
-        }
-        if (rlist.displayRemove)
-        {
-            num -= 25f;
-        }
-        rect = new Rect(num, rect.y, xMax - num, rect.height);
-        Rect rect2 = new Rect(num + 4f, rect.y - 3f, 25f, 13f);
-        Rect position = new Rect(xMax - 29f, rect.y - 3f, 25f, 13f);
-        if (Event.current.type == EventType.Repaint)
-        {
-            defaults.footerBackground.Draw(rect, false, false, false, false);
-        }
-        if (rlist.displayAdd && GUI.Button(rect2, (rlist.onAddDropdownCallback == null) ? defaults.iconToolbarPlus : defaults.iconToolbarPlusMore, defaults.preButton))
-        {
-            if (rlist.onAddDropdownCallback != null)
-            {
-                rlist.onAddDropdownCallback(rect2, rlist);
-            }
-            else
-            {
-                if (rlist.onAddCallback != null)
-                {
-                    rlist.onAddCallback(rlist);
-                }
-                else
-                {
-                    defaults.DoAddButton(rlist);
-                }
-            }
-            if (rlist.onChangedCallback != null)
-            {
-                rlist.onChangedCallback(rlist);
-            }
-        }
-        if (rlist.displayRemove)
-        {
-            EditorGUI.BeginDisabledGroup(rlist.index < 0 || rlist.index >= rlist.count || (rlist.onCanRemoveCallback != null && !rlist.onCanRemoveCallback(rlist)));
-            //EditorGUI.BeginDisabledGroup((rlist.onCanRemoveCallback != null && !rlist.onCanRemoveCallback(rlist)));
-
-            if (GUI.Button(position, defaults.iconToolbarMinus, defaults.preButton))
-            {
-                if (rlist.onRemoveCallback == null)
-                {
-                    defaults.DoRemoveButton(rlist);
-                }
-                else
-                {
-                    rlist.onRemoveCallback(rlist);
-                }
-                if (rlist.onChangedCallback != null)
-                {
-                    rlist.onChangedCallback(rlist);
-                }
-            }
-            EditorGUI.EndDisabledGroup();
-        }
     }
 
     /// <summary>
