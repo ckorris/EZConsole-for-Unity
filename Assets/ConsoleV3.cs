@@ -38,13 +38,20 @@ public class ConsoleV3 : MonoBehaviour
 
     }
 
-    // Update is called once per frame
-    void Update()
+    private void SetUpBindings()
     {
+        //TODO: Store methodinfos in a dictionary with the name as a key so multiple delegates on one method only need one reflection call. 
+        foreach(EZConsoleBindingSerial binding in _bindings)
+        {
+            MethodInfo minfo = CompileTimeScript.GetClass().GetMethod(binding.TargetMethodName); //The method to register
 
+            FieldInfo finfo = binding.ControlComponent.GetType().GetField(binding.ControlDelegateName); //The delegate to add the method to
+            
+            //TODO: Try replicating old register methods, but pass the whole delegate type as T instead of the delegate argument type. 
+        }
     }
 
-    public void SetBindings(List<EZConsoleBindingSerial> inputbinds)
+    public void SetBindings(List<EZConsoleBindingSerial> inputbinds) //Might not need this anymore. 
     {
         _bindings = new List<EZConsoleBindingSerial>();
         foreach (EZConsoleBindingSerial sbind in inputbinds)
