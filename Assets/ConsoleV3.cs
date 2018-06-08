@@ -59,6 +59,46 @@ public class ConsoleV3 : MonoBehaviour
             Bindings.Add(sbind);
         }
     }
+
+    private void RegisterDelegate(MethodInfo metinfo, FieldInfo finfo)
+    {
+        //Get delegate type (action or function) based on return type, etc. 
+        /*
+                //Find the parameters and return type of the target method
+                Type returntype = minfo.ReturnType;
+                ParameterInfo[] paraminfos = minfo.GetParameters();
+
+                //Make an array of types that include parameter types, with one at the end that represents the return type. 
+                //This will get used to find the delegate type we'll need, and follows the format required by Func. 
+                Type[] paramtypes = new Type[paraminfos.Length];
+                for (int p = 0; p < paraminfos.Length; p++)
+                {
+                    paramtypes[p] = paraminfos[p].ParameterType;
+                }
+
+                //Get the type of delegate that we'll need to assign to this. 
+                Type deltype;
+                if (returntype == typeof(void)) //Action type
+                {
+                    deltype = Expression.GetActionType(paramtypes);
+                }
+                else //Func type
+                {
+                    Array.Resize(ref paramtypes, paramtypes.Length + 1);
+                    paramtypes[paramtypes.Length - 1] = returntype;
+
+                    deltype = Expression.GetFuncType(paramtypes);
+                }
+         */
+    }
+
+    private void RegisterDelegateHelper<T>(MethodInfo metinfo, FieldInfo delinfo) //where T : somekindadelegate?
+    {
+        //To test. May need to make 16 versions for Action<T1,T2,T3> etc. and same with Func. But I want to avoid that. 
+        Delegate.CreateDelegate(typeof(T), RuntimeScript, metinfo); //Can I cast this? 
+
+        //Register into field
+    }
 }
 
 
