@@ -32,10 +32,16 @@ public class ConsoleV3 : MonoBehaviour
         }
     }
 
+
+    MethodInfo _registerMethod;
+
     // Use this for initialization
     void Start()
     {
+        //Cache the method that registers a delegate. (May need to turn into list if we use the 32 brute force Func/Action thingy.)
+        _registerMethod = typeof(ConsoleV3).GetMethod("RegisterDelegateHelper", BindingFlags.Instance | BindingFlags.NonPublic);
 
+        SetUpBindings();
     }
 
     private void SetUpBindings()
@@ -43,15 +49,16 @@ public class ConsoleV3 : MonoBehaviour
         //TODO: Store methodinfos in a dictionary with the name as a key so multiple delegates on one method only need one reflection call. 
         foreach(EZConsoleBindingSerial binding in _bindings)
         {
-            MethodInfo minfo = CompileTimeScript.GetClass().GetMethod(binding.TargetMethodName); //The method to register
+            MethodInfo minfo = RuntimeScript.GetType().GetMethod(binding.TargetMethodName); //The method to register
 
             FieldInfo finfo = binding.ControlComponent.GetType().GetField(binding.ControlDelegateName); //The delegate to add the method to
-            
+
             //TODO: Try replicating old register methods, but pass the whole delegate type as T instead of the delegate argument type. 
+            RegisterDelegate(minfo, finfo, binding.ControlComponent);
         }
     }
 
-    public void SetBindings(List<EZConsoleBindingSerial> inputbinds) //Might not need this anymore. 
+    public void SetBindingsFromEditor(List<EZConsoleBindingSerial> inputbinds) //Might not need this anymore. 
     {
         _bindings = new List<EZConsoleBindingSerial>();
         foreach (EZConsoleBindingSerial sbind in inputbinds)
@@ -60,44 +67,48 @@ public class ConsoleV3 : MonoBehaviour
         }
     }
 
-    private void RegisterDelegate(MethodInfo metinfo, FieldInfo finfo)
+    private void RegisterDelegate(MethodInfo minfo, FieldInfo finfo, Component component)
     {
-        //Get delegate type (action or function) based on return type, etc. 
-        /*
-                //Find the parameters and return type of the target method
-                Type returntype = minfo.ReturnType;
-                ParameterInfo[] paraminfos = minfo.GetParameters();
+        //Find the return type of the target method
+        Type returntype = minfo.ReturnType;
 
-                //Make an array of types that include parameter types, with one at the end that represents the return type. 
-                //This will get used to find the delegate type we'll need, and follows the format required by Func. 
-                Type[] paramtypes = new Type[paraminfos.Length];
-                for (int p = 0; p < paraminfos.Length; p++)
-                {
-                    paramtypes[p] = paraminfos[p].ParameterType;
-                }
+        //Make an array of types that include parameter types, with one at the end that represents the return type. 
+        //This will get used to find the delegate type we'll need, and follows the format required by Func. 
+        ParameterInfo[] paraminfos = minfo.GetParameters();
+        Type[] paramtypes = new Type[paraminfos.Length];
+        for (int p = 0; p < paraminfos.Length; p++)
+        {
+            paramtypes[p] = paraminfos[p].ParameterType;
+        }
 
-                //Get the type of delegate that we'll need to assign to this. 
-                Type deltype;
-                if (returntype == typeof(void)) //Action type
-                {
-                    deltype = Expression.GetActionType(paramtypes);
-                }
-                else //Func type
-                {
-                    Array.Resize(ref paramtypes, paramtypes.Length + 1);
-                    paramtypes[paramtypes.Length - 1] = returntype;
+        //Get the type of delegate that we'll need to assign to this. 
+        Type deltype;
+        if (returntype == typeof(void)) //Action type
+        {
+            deltype = Expression.GetActionType(paramtypes);
+        }
+        else //Func type
+        {
+            Array.Resize(ref paramtypes, paramtypes.Length + 1);
+            paramtypes[paramtypes.Length - 1] = returntype;
 
-                    deltype = Expression.GetFuncType(paramtypes);
-                }
-         */
+            deltype = Expression.GetFuncType(paramtypes);
+        }
+
+        //Make a generic method for the exact type we need
+        MethodInfo registermethodgeneric = _registerMethod.MakeGenericMethod(deltype);
+        registermethodgeneric.Invoke(this, new object[] { minfo, finfo, component});
     }
 
-    private void RegisterDelegateHelper<T>(MethodInfo metinfo, FieldInfo delinfo) //where T : somekindadelegate?
+    private void RegisterDelegateHelper<T>(MethodInfo metinfo, FieldInfo finfo, Component component) 
     {
         //To test. May need to make 16 versions for Action<T1,T2,T3> etc. and same with Func. But I want to avoid that. 
-        Delegate.CreateDelegate(typeof(T), RuntimeScript, metinfo); //Can I cast this? 
+        Delegate d = Delegate.CreateDelegate(typeof(T), RuntimeScript, metinfo.Name);
 
         //Register into field
+        MulticastDelegate targetdelegate = finfo.GetValue(component) as MulticastDelegate; //Get the target list
+        Delegate combodelegate = Delegate.Combine(d, targetdelegate); //Add the new delegate to the invocation list of the old one
+        finfo.SetValue(component, combodelegate); //Set the delegate to the combined list
     }
 }
 
@@ -164,7 +175,7 @@ public class ConsoleV3Editor : Editor
             }
             else //The new script is empty, so just clear everything. 
             {
-                _console.SetBindings(new List<EZConsoleBindingSerial>());
+                _console.SetBindingsFromEditor(new List<EZConsoleBindingSerial>());
 
                 _editorBindingsList = new Dictionary<MethodInfo, List<EZConsoleBindingEditor>>();
             }
@@ -237,7 +248,7 @@ public class ConsoleV3Editor : Editor
 
             }
 
-            _console.SetBindings(MakeSerializableBindingList(_editorBindingsList));
+            _console.SetBindingsFromEditor(MakeSerializableBindingList(_editorBindingsList));
 
         }
     }
