@@ -5,8 +5,12 @@ using UnityEditor;
 using UnityEngine;
 using System.Reflection;
 
+/// <summary>
+/// Deprecated and refactored from "Console". First attempt at the console, but it depended on the target displays and controls inheriting specific objects, and
+/// still have far more limitations. Leaving here only for reference. 
+/// </summary>
 [Serializable]
-public class Console : MonoBehaviour
+public class OldConsole : MonoBehaviour
 {
     //public GameObject ScriptObject; //Can be assigned at compile- or runtime, but must contain a script assignable to the class of CompileTimeScript. 
 
@@ -49,10 +53,10 @@ public class Console : MonoBehaviour
         }*/
 
         //Cache MethodInfos for the register methods, so we can make them generic later without repeating these particular reflection calls. 
-        _displayRegisterMethod = typeof(Console).GetMethod("RegisterDisplayHelper", BindingFlags.Instance | BindingFlags.NonPublic);
-        _controlRegisterMethod = typeof(Console).GetMethod("RegisterControlHelper", BindingFlags.Instance | BindingFlags.NonPublic);
-        _displayDeregisterMethod = typeof(Console).GetMethod("DeregisterDisplayHelper", BindingFlags.Instance | BindingFlags.NonPublic);
-        _controlDeregisterMethod = typeof(Console).GetMethod("DeregisterControlHelper", BindingFlags.Instance | BindingFlags.NonPublic);
+        _displayRegisterMethod = typeof(OldConsole).GetMethod("RegisterDisplayHelper", BindingFlags.Instance | BindingFlags.NonPublic);
+        _controlRegisterMethod = typeof(OldConsole).GetMethod("RegisterControlHelper", BindingFlags.Instance | BindingFlags.NonPublic);
+        _displayDeregisterMethod = typeof(OldConsole).GetMethod("DeregisterDisplayHelper", BindingFlags.Instance | BindingFlags.NonPublic);
+        _controlDeregisterMethod = typeof(OldConsole).GetMethod("DeregisterControlHelper", BindingFlags.Instance | BindingFlags.NonPublic);
 
         #region Hard-Coded Test 
         if (false) //Change to turn this test on/off. 
@@ -307,10 +311,10 @@ public struct ControlBinding
 }
 
 
-[CustomEditor(typeof(Console))]
+[CustomEditor(typeof(OldConsole))]
 public class ConsoleEditor : Editor
 {
-    Console _console; //The console we're editing
+    OldConsole _console; //The console we're editing
 
     //Shorthand
     MonoScript _script
@@ -344,7 +348,7 @@ public class ConsoleEditor : Editor
 
     private void OnEnable()
     {
-        _console = (Console)target;
+        _console = (OldConsole)target;
         _lastScript = _script;
 
         UpdateBindings();

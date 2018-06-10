@@ -306,24 +306,6 @@ MonoBehaviour:
     ControlObject: {fileID: 1742118428}
     ControlComponent: {fileID: 1742118429}
     ControlDelegateName: OneShotAction
-  TestBindings:
-  - TargetMethodName: one
-    ControlObject: {fileID: 0}
-    ControlComponent: {fileID: 0}
-    ControlDelegateName: 
-  - TargetMethodName: two
-    ControlObject: {fileID: 0}
-    ControlComponent: {fileID: 0}
-    ControlDelegateName: 
-  - TargetMethodName: three
-    ControlObject: {fileID: 0}
-    ControlComponent: {fileID: 0}
-    ControlDelegateName: 
-  SingleSerial:
-    TargetMethodName: 0
-    ControlObject: {fileID: 0}
-    ControlComponent: {fileID: 0}
-    ControlDelegateName: 
 --- !u!1 &1708092959
 GameObject:
   m_ObjectHideFlags: 0
