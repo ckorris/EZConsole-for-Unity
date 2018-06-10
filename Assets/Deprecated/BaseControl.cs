@@ -4,7 +4,8 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// /// All control types inherit from this, but explicitly mention the type. 
+/// Deprecated. Any script with Action or Func delegates can be assigned as BaseControl would have been. 
+/// All control types inherit from this, but explicitly mention the type. 
 /// Example: "FloatSlider : BaseControl<float>"
 /// </summary>
 /// <typeparam name="T"></typeparam>

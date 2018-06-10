@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
+/// Deprecated. Any script with Action or Func delegates can be assigned as BaseControl would have been. 
 /// All display types inherit from this, but explicitly mention the type. 
 /// Example: "BarDisplay : BaseDisplay<float>"
 /// </summary>
