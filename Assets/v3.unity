@@ -301,11 +301,29 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   CompileTimeScript: {fileID: 11500000, guid: 7b5ad8fc737db624284838568e094c80, type: 3}
   RuntimeScript: {fileID: 1708092960}
-  _bindings:
-  - TargetMethodName: set_BoolProperty
+  Bindings:
+  - TargetMethodName: Fire
     ControlObject: {fileID: 1742118428}
     ControlComponent: {fileID: 1742118429}
-    ControlDelegateName: BoolAction
+    ControlDelegateName: OneShotAction
+  TestBindings:
+  - TargetMethodName: one
+    ControlObject: {fileID: 0}
+    ControlComponent: {fileID: 0}
+    ControlDelegateName: 
+  - TargetMethodName: two
+    ControlObject: {fileID: 0}
+    ControlComponent: {fileID: 0}
+    ControlDelegateName: 
+  - TargetMethodName: three
+    ControlObject: {fileID: 0}
+    ControlComponent: {fileID: 0}
+    ControlDelegateName: 
+  SingleSerial:
+    TargetMethodName: 0
+    ControlObject: {fileID: 0}
+    ControlComponent: {fileID: 0}
+    ControlDelegateName: 
 --- !u!1 &1708092959
 GameObject:
   m_ObjectHideFlags: 0

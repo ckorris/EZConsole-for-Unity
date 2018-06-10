@@ -379,7 +379,7 @@ public class ConsoleEditor : Editor
             _console.ChangeRuntimeScript(newcomponent);
         }
 
-        EditorGUILayout.EndHorizontal();
+
 
         //Display bindings
         EditorGUILayout.Space();
