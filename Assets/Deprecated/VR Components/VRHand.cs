@@ -15,8 +15,6 @@ public class VRHand : VRControllerComponent
 
     UseState _useState = UseState.Empty; //What's the hand doing right now? 
 
-
-
     // Use this for initialization
     void Start()
     {

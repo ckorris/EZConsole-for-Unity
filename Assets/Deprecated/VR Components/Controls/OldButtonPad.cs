@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public class ButtonPad : BasePressControl<bool> //Should be null but you can't do that in C#. Need to add support in EZConsole. 
+public class OldButtonPad : OldBasePressControl<bool> //Should be null but you can't do that in C#. Need to add support in EZConsole. 
 {
 
 	// Use this for initialization

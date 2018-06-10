@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public class ThrottleHandle : BaseGrabAndPressControl<float>
+public class OldThrottleHandle : OldBaseGrabAndPressControl<float>
 {
     public float ArticulationLength = 0.3f;
 

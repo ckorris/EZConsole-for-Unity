@@ -6,7 +6,7 @@ using UnityEngine;
 /// Derive from to make a VR control to press that can interface with EZConsole
 /// </summary>
 /// <typeparam name="T"></typeparam>
-public abstract class BasePressControl<T> : BaseControl<T>, IVRPressable
+public abstract class OldBasePressControl<T> : BaseControl<T>, IVRPressable
 {
     private Material _hoverMaterial;
     private Material[] _startMaterials;

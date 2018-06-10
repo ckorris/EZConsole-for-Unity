@@ -3,11 +3,11 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// Derive from to make a VR control to grab that can interface with EZConsole
+/// Derive from to make a VR control that you can both grab or press, and that interfaces with EZConsole
+/// Example of this would be a throttle: You can slide it gently or hold on for awhile. 
 /// </summary>
 /// <typeparam name="T"></typeparam>
-/// 
-public abstract class BaseGrabControl<T> : BaseControl<T>, IVRGrabbable
+public abstract class OldBaseGrabAndPressControl<T> : BaseControl<T>, IVRGrabbable, IVRPressable
 {
     private Material _hoverMaterial;
     private Material[] _startMaterials;
@@ -17,6 +17,17 @@ public abstract class BaseGrabControl<T> : BaseControl<T>, IVRGrabbable
         //Set up materials for hovering
         _hoverMaterial = Resources.Load("HoveredMat") as Material;
         _startMaterials = gameObject.GetComponent<MeshRenderer>().materials;
+    }
+
+    public GameObject GetGameObject()
+    {
+        return gameObject;
+    }
+
+    public bool CheckValidUseType(UseTypes use)
+    {
+        if (use == UseTypes.Grab || use == UseTypes.Press) return true;
+        else return false; 
     }
 
     public virtual void GrabStart(VRControllerComponent controller)
@@ -29,15 +40,14 @@ public abstract class BaseGrabControl<T> : BaseControl<T>, IVRGrabbable
         
     }
 
-    public GameObject GetGameObject()
+    public virtual void PressStart(VRControllerComponent controller)
     {
-        return gameObject;
+        
     }
 
-    public bool CheckValidUseType(UseTypes use)
+    public virtual void PressEnd()
     {
-        if (use == UseTypes.Grab) return true;
-        else return false;
+        
     }
 
     public virtual void HoverEnter()

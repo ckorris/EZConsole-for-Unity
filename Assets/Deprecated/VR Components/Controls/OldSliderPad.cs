@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public class SliderPad : BasePressControl<float>
+public class OldSliderPad : OldBasePressControl<float>
 {
     public float ArticulationLength = 0.1f;
 
