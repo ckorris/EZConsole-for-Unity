@@ -22,6 +22,8 @@ public class Console : MonoBehaviour
     [SerializeField]
     public List<EZConsoleBindingSerial> Bindings;
 
+    List<RegisteredBindingReference> Registrations = new List<RegisteredBindingReference>(); //Holds references to registrations that can be used to de-register them. 
+
     MethodInfo _registerMethod; //TMethodInfo for making a generic version of RegisterDelegateHelper<T>. Caching saves on reflection. 
 
     // Use this for initialization
@@ -64,14 +66,13 @@ public class Console : MonoBehaviour
     /// <param name="newscript"></param>
     public void ChangeRuntimeScript(Component oldscript, Component newscript)
     {
-        if (newscript != RuntimeScript)
+        if (newscript != oldscript)
         {
-            if (Application.isPlaying) //Didn't change via editor
+            if (Application.isPlaying) 
             {
-                if (RuntimeScript != null) //Remove old bindings
+                if (oldscript != null) //Remove old bindings
                 {
-                    //TODO: Deregister existing bindings
-                    Debug.LogWarning("Note: Unsubscribing old bindings not yet implemented. Bindings from last script are still registered.");
+                    DeregisterAll();
                 }
 
                 RuntimeScript = newscript;
@@ -138,13 +139,43 @@ public class Console : MonoBehaviour
     private void RegisterDelegateHelper<T>(MethodInfo metinfo, FieldInfo finfo, Component component)
     {
         //To test. May need to make 16 versions for Action<T1,T2,T3> etc. and same with Func. But I want to avoid that. 
-        Delegate d = Delegate.CreateDelegate(typeof(T), RuntimeScript, metinfo.Name);
+        Delegate mdelegate = Delegate.CreateDelegate(typeof(T), RuntimeScript, metinfo.Name);
 
         //Register into field
-        MulticastDelegate targetdelegate = finfo.GetValue(component) as MulticastDelegate; //Get the target list
-        Delegate combodelegate = Delegate.Combine(d, targetdelegate); //Add the new delegate to the invocation list of the old one
+        MulticastDelegate targetdelegate = finfo.GetValue(component) as MulticastDelegate; //Get the target delegate
+        Delegate combodelegate = Delegate.Combine(mdelegate, targetdelegate); //Add the new delegate to the invocation list of the old one
         finfo.SetValue(component, combodelegate); //Set the delegate to the combined list
+
+        //Store registration in Registrations in case we remove it later. 
+        Registrations.Add(new RegisteredBindingReference()
+        {
+            MDelegate = mdelegate,
+            DelFInfo = finfo, 
+            ControlComponent = component
+        });
     }
+
+    /// <summary>
+    /// Goes through all existing registrations and removes the method delegates from the control delegates' invocation lists. 
+    /// </summary>
+    private void DeregisterAll()
+    {
+        foreach (RegisteredBindingReference rbr in Registrations)
+        {
+            MulticastDelegate targetdelegate = rbr.DelFInfo.GetValue(rbr.ControlComponent) as MulticastDelegate;
+            Delegate finaldelegate = Delegate.Remove(targetdelegate, rbr.MDelegate); //Remove method delegate from target's invoke list
+            rbr.DelFInfo.SetValue(rbr.ControlComponent, finaldelegate); //Set target delegate to one with shorter invoke list
+        }
+
+        Registrations.Clear();
+    }
+}
+
+public struct RegisteredBindingReference
+{
+    public Delegate MDelegate; //The delegate created at registration that represents the target method
+    public FieldInfo DelFInfo; //The FieldInfo of the delegate value on the target component
+    public Component ControlComponent; //The component with the delegate that needs to be removed 
 }
 
 /// <summary>
