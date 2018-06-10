@@ -302,6 +302,10 @@ MonoBehaviour:
   CompileTimeScript: {fileID: 11500000, guid: 7b5ad8fc737db624284838568e094c80, type: 3}
   RuntimeScript: {fileID: 1708092960}
   Bindings:
+  - TargetMethodName: set_BoolProperty
+    ControlObject: {fileID: 1742118428}
+    ControlComponent: {fileID: 1742118429}
+    ControlDelegateName: BoolAction
   - TargetMethodName: Fire
     ControlObject: {fileID: 1742118428}
     ControlComponent: {fileID: 1742118429}

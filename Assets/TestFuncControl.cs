@@ -31,7 +31,7 @@ public class TestFuncControl : MonoBehaviour
     {
 		if(Input.GetKeyDown(KeyCode.Space))
         {
-            OneShotAction.Invoke();
+            if(OneShotAction != null) OneShotAction.Invoke();
         }
 	}
 
