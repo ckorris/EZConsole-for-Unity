@@ -3,11 +3,11 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class ButtonPad : PressControlBase
+public abstract class ButtonPad : PressControlBase
 {
-    public Action OnPress; //Gets called when, well, you know. This is the delegate we bind to the Console. 
+    //public Action OnPress; //Gets called when, well, you know. This is the delegate we bind to the Console. 
 
-    public float ArticulationLength = 0.05f; //How far it extends downward
+    public float ArticulationLength = 0.03f; //How far it extends downward
     float _articulatePercentage
     {
         get
@@ -77,7 +77,8 @@ public class ButtonPad : PressControlBase
             {
                 if(_crossedThresholdSinceLastFire) //We're allowed to fire once. 
                 {
-                    if(OnPress != null) OnPress.Invoke(); //Fire the action
+                    //if(OnPress != null) OnPress.Invoke(); //Fire the action //Except no, we're making this an abstract class.
+                    InvokeAction(); //This method should call the action with whatever logic you'd prefer. 
                     _crossedThresholdSinceLastFire = false; //Prevent another invocation until the button returns past the threshold
                     if (_audioSource) _audioSource.Play(); //Play the boop or whatever
                     StartCoroutine(_controller.VibrateOnce(0.5f, 0.02f)); //Buzz the controller slightly
@@ -118,5 +119,11 @@ public class ButtonPad : PressControlBase
 
         _controller = null;
     }
+
+    /// <summary>
+    /// InvokeAction is called when the button is pressed. Being abstract lets you override it
+    /// with logic that can call any kind of action you want. 
+    /// </summary>
+    public abstract void InvokeAction();
 
 }

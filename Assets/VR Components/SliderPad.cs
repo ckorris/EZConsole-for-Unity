@@ -7,6 +7,8 @@ public class SliderPad : PressControlBase
 {
     public Action<float> OnSlide;
 
+    public float MinValue = 0; //Value sent when throttle is at zero. 
+    public float MaxValue = 1; //Value sent when throttle is at full.
     public float ArticulationLength = 0.1f;
     float _articulatePercentage
     {
@@ -65,7 +67,11 @@ public class SliderPad : PressControlBase
             if (_articulatePercentage != _lastsetting) //Don't bother calling if we haven't changed it
             {
                 //Activate the ability 
-                if (OnSlide != null) OnSlide.Invoke(_articulatePercentage);
+                if (OnSlide != null)
+                {
+                    float lerpedpercentage = Mathf.Lerp(MinValue, MaxValue, _articulatePercentage);
+                    OnSlide.Invoke(lerpedpercentage);
+                }
 
                 //Play haptics based on how far you slid the slider
                 float slidedist = Mathf.Abs(_articulatePercentage - _lastsetting);
