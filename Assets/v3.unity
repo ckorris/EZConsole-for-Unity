@@ -306,6 +306,10 @@ MonoBehaviour:
     ControlObject: {fileID: 1742118428}
     ControlComponent: {fileID: 1742118429}
     ControlDelegateName: OneShotAction
+  - TargetMethodName: set_BoolProperty
+    ControlObject: {fileID: 1742118428}
+    ControlComponent: {fileID: 1742118429}
+    ControlDelegateName: BoolAction
 --- !u!1 &1708092959
 GameObject:
   m_ObjectHideFlags: 0

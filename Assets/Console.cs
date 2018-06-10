@@ -238,6 +238,8 @@ public class ConsoleV3Editor : Editor
         #endregion
 
         EditorGUILayout.Separator();
+        GUILayout.Label("Bindable Methods: ", EditorStyles.boldLabel, layoutoptions);
+
 
         //Create a list for each target 
         if (_script != null)
@@ -365,7 +367,11 @@ public class ConsoleV3Editor : Editor
                 reorderablelist.onAddCallback = (list) =>
                 {
                     _bindingsSerial.arraySize += 1;
-                    _bindingsSerial.GetArrayElementAtIndex(_bindingsSerial.arraySize - 1).FindPropertyRelative("TargetMethodName").stringValue = minfo.Name;
+                    SerializedProperty newprop = _bindingsSerial.GetArrayElementAtIndex(_bindingsSerial.arraySize - 1);
+                    newprop.FindPropertyRelative("TargetMethodName").stringValue = minfo.Name;
+                    newprop.FindPropertyRelative("ControlObject").objectReferenceValue = null;
+                    newprop.FindPropertyRelative("ControlComponent").objectReferenceValue = null;
+                    newprop.FindPropertyRelative("ControlDelegateName").stringValue = "";
                 };
 
                 //Pressing the delete button, likewise, removes from the serialized list. But we have to properly point to the last item with this methodinfo.
@@ -379,7 +385,12 @@ public class ConsoleV3Editor : Editor
                     bool foundit = false; //For error reporting
                     for(int i = 0; i < _bindingsSerial.arraySize; i++)
                     {
-                        if(_bindingsSerial.GetArrayElementAtIndex(i).FindPropertyRelative("ControlDelegateName").stringValue == lastebind.ControlDelegateName)
+                        //Make sure the properties are identical. (We can't compare them directly, it'll always fail.)
+                        SerializedProperty proptodelete = _bindingsSerial.GetArrayElementAtIndex(i);
+                        if (proptodelete.FindPropertyRelative("TargetMethodName").stringValue == minfo.Name &&
+                            proptodelete.FindPropertyRelative("ControlObject").objectReferenceValue == lastebind.ControlObject &&
+                            proptodelete.FindPropertyRelative("ControlComponent").objectReferenceValue == lastebind.ControlComponent &&
+                            proptodelete.FindPropertyRelative("ControlDelegateName").stringValue == lastebind.ControlDelegateName)
                         {
                             _bindingsSerial.DeleteArrayElementAtIndex(i); //This works because it doesn't get applied until next frame. 
                             foundit = true;
@@ -395,6 +406,9 @@ public class ConsoleV3Editor : Editor
                 //Drawing is gonna be complicated. We're drawing based on the editorbinding, but we have to make sure changes write to the serializedproperty. 
                 reorderablelist.drawElementCallback = (rect, index, isActive, isFocused) =>
                 {
+                    //The list will try to draw newly-deleted objects for one frame. Prevent errors from being thrown. 
+                    if (_bindingsSerial.GetArrayElementAtIndex(index) == null) return;
+
                     //Setup editor binding and serialized properties
                     EZConsoleBindingEditor ebind = editorbindings[minfo][index];
                     SerializedProperty controlobjectserial = ebind.SerialBinding.FindPropertyRelative("ControlObject");
