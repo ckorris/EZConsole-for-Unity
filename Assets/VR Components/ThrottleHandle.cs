@@ -60,7 +60,7 @@ public class ThrottleHandle : GrabOrPressControlBase
 
             Vector3 posdifference = _controller.transform.position - _controllerGrabPos; //The vector that the controller moved since start
             posdifference = transform.rotation * posdifference; //Rotate it so that the Z value is lined up with the sliding direction
-            transform.position = _grabPos + transform.rotation * (Vector3.forward * posdifference.z); //Set the position relative to the grab start. 
+            transform.position = _grabPos + Quaternion.Inverse(transform.rotation) * (Vector3.forward * posdifference.z); //Set the position relative to the grab start. 
 
             _articulatePercentage = Mathf.Clamp01(_articulatePercentage); //Don't let it exceed its bounds 
 

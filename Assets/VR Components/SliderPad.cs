@@ -56,15 +56,15 @@ public class SliderPad : PressControlBase
         //Update the position if the controller is manipulating it.
         if (_isBeingUsed)
         {
-            float _lastsetting = _articulatePercentage; //Cache this so we can see if we've changed it this frame
+            float lastsetting = _articulatePercentage; //Cache this so we can see if we've changed it this frame
 
             Vector3 posdifference = _controller.transform.position - _controllerGrabPos; //The vector that the controller moved since start
             posdifference = transform.rotation * posdifference; //Rotate it so that the Z value is lined up with the sliding direction
-            transform.position = _grabPos + transform.rotation * (Vector3.forward * posdifference.z); //Set the position relative to the grab start. 
+            transform.position = _grabPos + Quaternion.Inverse(transform.rotation) * (Vector3.forward * posdifference.z); //Set the position relative to the grab start. 
 
             _articulatePercentage = Mathf.Clamp01(_articulatePercentage); //Don't let it exceed its bounds 
 
-            if (_articulatePercentage != _lastsetting) //Don't bother calling if we haven't changed it
+            if (_articulatePercentage != lastsetting) //Don't bother calling if we haven't changed it
             {
                 //Activate the ability 
                 if (OnSlide != null)
@@ -74,7 +74,7 @@ public class SliderPad : PressControlBase
                 }
 
                 //Play haptics based on how far you slid the slider
-                float slidedist = Mathf.Abs(_articulatePercentage - _lastsetting);
+                float slidedist = Mathf.Abs(_articulatePercentage - lastsetting);
                 StartCoroutine(_controller.VibrateOnce(Mathf.Clamp01(slidedist * HapticSlideStrengthModifier), Time.deltaTime));
 
                 //Play stronger vibrations when you hit the edges
@@ -106,7 +106,7 @@ public class SliderPad : PressControlBase
 
     private void OnDrawGizmosSelected()
     {
-        //Draw the blue line to show the sliding path.
+        //Draw the green line to show the sliding path.
         Vector3 zeropos;
         if(Application.isPlaying && transform.parent != null)
         {
@@ -116,9 +116,8 @@ public class SliderPad : PressControlBase
         {
             zeropos = transform.position;
         }
-        //Vector3 zeropos = (Application.isPlaying) ? transform.parent.TransformPoint(_startPosition) : transform.position;
         Vector3 fullpos = zeropos + transform.localRotation * new Vector3(0, 0, ArticulationLength);
-        Gizmos.color = Color.blue;
+        Gizmos.color = Color.green;
         Gizmos.DrawLine(zeropos, fullpos);
     }
 }
