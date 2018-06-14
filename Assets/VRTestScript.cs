@@ -7,6 +7,19 @@ public class VRTestScript : MonoBehaviour
     bool _someBoolState = false;
     float _someFloatState = 0f;
 
+    public int _someIntProperty = 55;
+    public int SomeIntProperty
+    {
+        get
+        {
+            return _someIntProperty;
+        }
+        set
+        {
+            _someIntProperty = value;
+        }
+    }
+
     public void ActivateOnce()
     {
         print("PEW PEW PEW");
