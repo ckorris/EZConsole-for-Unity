@@ -27,7 +27,7 @@ public class Console : MonoBehaviour
     MethodInfo _registerMethod; //TMethodInfo for making a generic version of RegisterDelegateHelper<T>. Caching saves on reflection. 
 
     // Use this for initialization
-    void Start()
+    void Awake()
     {
         //Cache the method that registers a delegate. (May need to turn into list if we use the 32 brute force Func/Action thingy.)
         _registerMethod = typeof(Console).GetMethod("RegisterDelegateHelper", BindingFlags.Instance | BindingFlags.NonPublic);

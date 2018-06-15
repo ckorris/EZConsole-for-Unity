@@ -20,6 +20,8 @@ public class VRTestScript : MonoBehaviour
         }
     }
 
+    public Camera FrontCamera { get; private set; }
+
     public void ActivateOnce()
     {
         print("PEW PEW PEW");
@@ -57,9 +59,9 @@ public class VRTestScript : MonoBehaviour
 
 
 	// Use this for initialization
-	void Start ()
+	void Awake ()
     {
-		
+        FrontCamera = GetComponentInChildren<Camera>();
 	}
 	
 	// Update is called once per frame
