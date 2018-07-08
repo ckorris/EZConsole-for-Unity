@@ -235,6 +235,7 @@ public class ConsoleV3Editor : Editor
 
     public override void OnInspectorGUI()
     {
+        DrawDefaultInspector();
         GUILayoutOption[] layoutoptions = new GUILayoutOption[2]
         {
             GUILayout.MaxWidth(EditorGUIUtility.currentViewWidth / 2),
@@ -276,7 +277,7 @@ public class ConsoleV3Editor : Editor
         if (_script != null)
         {
             //Make the dictionary of editorbindings, which represents the lists only in the editor.
-            Dictionary<MethodInfo, List<EZConsoleBindingEditor>> editorbindings = new Dictionary<MethodInfo, List<EZConsoleBindingEditor>>();
+            Dictionary<MemberInfo, List<EZConsoleBindingEditor>> editorbindings = new Dictionary<MemberInfo, List<EZConsoleBindingEditor>>();
 
             #region Populate Editor Bindings Dictionary
             //Get list of methods using reflection. 
@@ -286,9 +287,18 @@ public class ConsoleV3Editor : Editor
                 .Where(x => !x.DeclaringType.IsAssignableFrom(typeof(MonoBehaviour)))
                 .ToArray();
 
+            FieldInfo[] fields = _scriptType.GetFields(BindingFlags.Instance | BindingFlags.Public)
+                .Where(x => !x.DeclaringType.IsAssignableFrom(typeof(MonoBehaviour)))
+                .ToArray();
+
+            //Make lists for methods and fields
             for (int i = 0; i < methods.Length; i++)
             {
                 editorbindings.Add(methods[i], new List<EZConsoleBindingEditor>());
+            }
+            for(int i = 0; i < fields.Length; i++)
+            {
+                editorbindings.Add(fields[i], new List<EZConsoleBindingEditor>());
             }
 
             //Iterate through the serialized bindings list and make an EZConsoleBindingEditor item for each one.
@@ -296,7 +306,8 @@ public class ConsoleV3Editor : Editor
             {
                 SerializedProperty sprop = _bindingsSerial.GetArrayElementAtIndex(i);
                 string methodname = sprop.FindPropertyRelative("TargetMethodName").stringValue;
-                MethodInfo minfokey = editorbindings.Keys.FirstOrDefault(m => m.Name == methodname);
+                MemberInfo minfokey = editorbindings.Keys.FirstOrDefault(m => m.Name == methodname);
+                //MemberType type = (MemberType) Enum.Parse(typeof(MemberType), sprop.FindPropertyRelative("TargetType").stringValue);
 
                 if (minfokey != null) //Make sure we have a list available.
                 {
@@ -320,18 +331,38 @@ public class ConsoleV3Editor : Editor
 
             #region Draw ReorderableLists
             //Now we've got a dictionary of editor bindings, and each binding points to a serialized property. Time to draw the lists. 
-            foreach (MethodInfo minfo in editorbindings.Keys)
+            foreach (MemberInfo minfo in editorbindings.Keys)
             {
-                //Find the parameters and return type of the target method
-                Type returntype = minfo.ReturnType;
-                ParameterInfo[] paraminfos = minfo.GetParameters();
+                Type returntype;
+                Type[] paramtypes;
 
-                //Make an array of types that include parameter types, with one at the end that represents the return type. 
-                //This will get used to find the delegate type we'll need, and follows the format required by Func. 
-                Type[] paramtypes = new Type[paraminfos.Length];
-                for (int p = 0; p < paraminfos.Length; p++)
+                if (minfo.MemberType == MemberTypes.Method)
                 {
-                    paramtypes[p] = paraminfos[p].ParameterType;
+                    MethodInfo methinfo = (MethodInfo)minfo;
+                    //Find the parameters and return type of the target method
+                    returntype = methinfo.ReturnType;
+
+                    ParameterInfo[] paraminfos = methinfo.GetParameters();
+
+                    //Make an array of types that include parameter types, with one at the end that represents the return type. 
+                    //This will get used to find the delegate type we'll need, and follows the format required by Func. 
+                    paramtypes = new Type[paraminfos.Length];
+                    for (int p = 0; p < paraminfos.Length; p++)
+                    {
+                        paramtypes[p] = paraminfos[p].ParameterType;
+                    }
+                }
+                else if(minfo.MemberType == MemberTypes.Field)
+                {
+                    FieldInfo fieldinfo = (FieldInfo)minfo;
+                    returntype = fieldinfo.FieldType;
+                    paramtypes = new Type[1] { fieldinfo.FieldType };
+                }
+                else
+                {
+                    returntype = null;
+                    paramtypes = null;
+                    Debug.LogError("Console created memberinfo that's not a MethodInfo or FieldInfo");
                 }
 
                 //Get the type of delegate that we'll need to assign to this. 
@@ -354,167 +385,19 @@ public class ConsoleV3Editor : Editor
                 #region ReorderableList Callback Assignments
                 //Now we assign to all the ReorderableList's callbacks that we need. Unity handles when they're fired. 
                 //Add label to the header
-                reorderablelist.drawHeaderCallback = (Rect rect) =>
-                {
-                    EditorGUILayout.BeginHorizontal();
-                    EditorGUI.LabelField(new Rect(rect.x, rect.y, rect.width / 2, rect.height), minfo.Name, EditorStyles.boldLabel);
-
-                    //Make a string to represent the delegate type. (If we just convert to string, it'll be "Func`1" or some garbage
-                    string deltypename;
-                    if (deltype.Name.Contains("Action")) deltypename = "Action<";
-                    else deltypename = "Func<";
-                    foreach(ParameterInfo pinfo in paraminfos)
-                    {
-                        deltypename += ConvertToSimpleName(pinfo.ParameterType) + ", ";
-                    }
-                    
-                    if (minfo.ReturnType != typeof(void) && minfo.ReturnType != null)
-                    {
-                        
-                        deltypename += ConvertToSimpleName(minfo.ReturnType);
-                    }
-                    else
-                    {
-
-                        int? last = deltypename.LastIndexOf(", ");
-                        if ((int)last > 0)
-                        {
-                            deltypename = deltypename.Remove((int)last, 2); //Remove the last comma we added //(new char[2] { ',', ' ' }); 
-                        }
-                        
-                    }
-
-                    deltypename += ">";
-                    GUIStyle italicfontstyle = new GUIStyle(EditorStyles.label) { fontStyle = FontStyle.Italic };
-                    EditorGUI.LabelField(new Rect(rect.x + rect.width / 2, rect.y, rect.width / 2, rect.height), deltypename, italicfontstyle);
-                    
-                    EditorGUILayout.EndHorizontal();
-                };
+                reorderablelist.drawHeaderCallback = (Rect rect) => DrawHeader(rect, minfo, deltype, returntype, paramtypes);
 
                 //We can always press the remove button for now because it's glitchy as hell in Unity. 
                 reorderablelist.onCanRemoveCallback = (list) => { return list.list.Count > 0; };
 
                 //Pressing the add button should add to the serialized list, not the editor binding list. 
-                reorderablelist.onAddCallback = (list) =>
-                {
-                    _bindingsSerial.arraySize += 1;
-                    SerializedProperty newprop = _bindingsSerial.GetArrayElementAtIndex(_bindingsSerial.arraySize - 1);
-                    newprop.FindPropertyRelative("TargetMethodName").stringValue = minfo.Name;
-                    newprop.FindPropertyRelative("ControlObject").objectReferenceValue = null;
-                    newprop.FindPropertyRelative("ControlComponent").objectReferenceValue = null;
-                    newprop.FindPropertyRelative("ControlDelegateName").stringValue = "";
-                };
+                reorderablelist.onAddCallback = (list) => AddBinding(list, minfo);
 
                 //Pressing the delete button, likewise, removes from the serialized list. But we have to properly point to the last item with this methodinfo.
-                reorderablelist.onRemoveCallback = (list) =>
-                {
-                    if (list.count <= 0) return;
-
-                    EZConsoleBindingEditor lastebind = (EZConsoleBindingEditor)list.list[list.list.Count - 1];
-                    //Find the index of lastebind's serializedproperty in _bindingsSerial
-
-                    bool foundit = false; //For error reporting
-                    for(int i = 0; i < _bindingsSerial.arraySize; i++)
-                    {
-                        //Make sure the properties are identical. (We can't compare them directly, it'll always fail.)
-                        SerializedProperty proptodelete = _bindingsSerial.GetArrayElementAtIndex(i);
-                        if (proptodelete.FindPropertyRelative("TargetMethodName").stringValue == minfo.Name &&
-                            proptodelete.FindPropertyRelative("ControlObject").objectReferenceValue == lastebind.ControlObject &&
-                            proptodelete.FindPropertyRelative("ControlComponent").objectReferenceValue == lastebind.ControlComponent &&
-                            proptodelete.FindPropertyRelative("ControlDelegateName").stringValue == lastebind.ControlDelegateName)
-                        {
-                            _bindingsSerial.DeleteArrayElementAtIndex(i); //This works because it doesn't get applied until next frame. 
-                            foundit = true;
-                            break;
-                        }
-                    }
-                    if(foundit == false) //Report error if we couldn't find it. 
-                    {
-                        Debug.LogError("Tried to delete " + lastebind.ControlDelegateName + " binding but couldn't find it in the serialized list.");
-                    }
-                };
+                reorderablelist.onRemoveCallback = (list) => RemoveBinding(list, minfo);
 
                 //Drawing is gonna be complicated. We're drawing based on the editorbinding, but we have to make sure changes write to the serializedproperty. 
-                reorderablelist.drawElementCallback = (rect, index, isActive, isFocused) =>
-                {
-                    //The list will try to draw newly-deleted objects for one frame. Prevent errors from being thrown. 
-                    if (_bindingsSerial.GetArrayElementAtIndex(index) == null) return;
-
-                    //Setup editor binding and serialized properties
-                    EZConsoleBindingEditor ebind = editorbindings[minfo][index];
-                    SerializedProperty controlobjectserial = ebind.SerialBinding.FindPropertyRelative("ControlObject");
-                    SerializedProperty controlcomponentserial = ebind.SerialBinding.FindPropertyRelative("ControlComponent");
-                    SerializedProperty delegatenameserial = ebind.SerialBinding.FindPropertyRelative("TargetDelegateName");
-
-                    //Control object
-                    Rect controlobjectrect = new Rect(rect.x, rect.y, rect.width / 2, EditorGUIUtility.singleLineHeight);
-                    ebind.ControlObject = (GameObject)EditorGUI.ObjectField(controlobjectrect, ebind.ControlObject, typeof(UnityEngine.Object), true);
-                    controlobjectserial.objectReferenceValue = ebind.ControlObject;
-
-                    #region Component/Delegate Drop-Down 
-                    //Drop-down button for choosing the specific component/delegate. Similar to assigning events to Unity's Button UI. 
-                    EditorGUI.BeginDisabledGroup(ebind.ControlObject == null);
-                    //Set the name you see on the non-expanded version be either the target delegate name or "No Function." 
-                    string dropdowntext;
-                    if (ebind.ControlDelegateName == "" || ebind.ControlDelegateName == null)
-                    {
-                        dropdowntext = "No Function";
-                    }
-                    else
-                    {
-                        dropdowntext = ebind.ControlDelegateName;
-                    }
-                    GUIContent dropdowncontent = new GUIContent(dropdowntext);
-
-                   
-                    Rect dropdownrect = new Rect(rect.x + rect.width / 2, rect.y, rect.width / 2, EditorGUIUtility.singleLineHeight);
-                    if (EditorGUI.DropdownButton(dropdownrect, dropdowncontent, FocusType.Keyboard))
-                    {
-                        GenericMenu menu = new GenericMenu();
-
-                        //Add the "No Component" option
-                        MenuSelectComponent emptymsc = new MenuSelectComponent()
-                        {
-                            binding = ebind,
-                            bindobject = ebind.ControlObject,
-                            component = null,
-                            delegatename = null
-                        };
-                        menu.AddItem(new GUIContent("None"), ebind.ControlComponent == null, SelectFunction, emptymsc);
-
-                        menu.AddSeparator("");
-
-                        //List all components
-                        Component[] components = ebind.ControlObject.GetComponents<Component>();
-                        for(int j = 0; j < components.Length; j++)
-                        {
-                            //List all delegates in the control, whihc includes actions, functions, etc. 
-                            List<FieldInfo> fieldinfos = components[j].GetType().GetFields(BindingFlags.Public | BindingFlags.Instance)
-                            .Where(t => t.FieldType.IsAssignableFrom(deltype))
-                            .ToList();
-
-                            foreach(FieldInfo finfo in fieldinfos)
-                            {
-                                MenuSelectComponent msc = new MenuSelectComponent()
-                                {
-                                    binding = ebind,
-                                    component = components[j],
-                                    bindobject = ebind.ControlObject,
-                                    delegatename = finfo.Name
-                                };
-
-                                string path = components[j].GetType().Name + "/" + finfo.Name;
-                                menu.AddItem(new GUIContent(path), ebind.ControlComponent == components[j], SelectFunction, msc);
-                            }
-                        }
-
-                        menu.ShowAsContext();
-                    }
-
-                    EditorGUI.EndDisabledGroup();
-                    #endregion
-
-                };
+                reorderablelist.drawElementCallback = (rect, index, isActive, isFocused) => DrawElement(rect, index, isActive, isFocused, editorbindings, minfo, deltype);
                 #endregion
 
                 reorderablelist.index = reorderablelist.count - 1; //We need this for the removal button to work, because the index isn't set in any sane or observable way in Unity. 
@@ -551,6 +434,162 @@ public class ConsoleV3Editor : Editor
         msc.binding.SerialBinding.FindPropertyRelative("ControlComponent").objectReferenceValue = msc.component;
         msc.binding.SerialBinding.FindPropertyRelative("ControlObject").objectReferenceValue = msc.bindobject;
         msc.binding.SerialBinding.FindPropertyRelative("ControlDelegateName").stringValue = msc.delegatename;
+    }
+
+    public void DrawHeader(Rect rect, MemberInfo minfo, Type deltype, Type returntype, Type[] paramtypes)
+    {
+        EditorGUILayout.BeginHorizontal();
+        EditorGUI.LabelField(new Rect(rect.x, rect.y, rect.width / 2, rect.height), minfo.Name, EditorStyles.boldLabel);
+
+        //Make a string to represent the delegate type. (If we just convert to string, it'll be "Func`1" or some garbage
+        string deltypename;
+        if (deltype.Name.Contains("Action")) deltypename = "Action<";
+        else deltypename = "Func<";
+        foreach (Type ptype in paramtypes)
+        {
+            deltypename += ConvertToSimpleName(ptype) + ", ";
+        }
+
+        if (returntype != typeof(void) && returntype != null)
+        {
+
+            deltypename += ConvertToSimpleName(returntype);
+        }
+        else
+        {
+
+            int? last = deltypename.LastIndexOf(", ");
+            if ((int)last > 0)
+            {
+                deltypename = deltypename.Remove((int)last, 2); //Remove the last comma we added //(new char[2] { ',', ' ' }); 
+            }
+
+        }
+
+        deltypename += ">";
+        GUIStyle italicfontstyle = new GUIStyle(EditorStyles.label) { fontStyle = FontStyle.Italic };
+        EditorGUI.LabelField(new Rect(rect.x + rect.width / 2, rect.y, rect.width / 2, rect.height), deltypename, italicfontstyle);
+
+        EditorGUILayout.EndHorizontal();
+    }
+
+    public void AddBinding(ReorderableList list, MemberInfo minfo)
+    {
+        _bindingsSerial.arraySize += 1;
+        SerializedProperty newprop = _bindingsSerial.GetArrayElementAtIndex(_bindingsSerial.arraySize - 1);
+        newprop.FindPropertyRelative("TargetMethodName").stringValue = minfo.Name;
+        newprop.FindPropertyRelative("ControlObject").objectReferenceValue = null;
+        newprop.FindPropertyRelative("ControlComponent").objectReferenceValue = null;
+        newprop.FindPropertyRelative("ControlDelegateName").stringValue = "";
+    }
+
+    public void RemoveBinding(ReorderableList list, MemberInfo minfo)
+    {
+        if (list.count <= 0) return;
+
+        EZConsoleBindingEditor lastebind = (EZConsoleBindingEditor)list.list[list.list.Count - 1];
+        //Find the index of lastebind's serializedproperty in _bindingsSerial
+
+        bool foundit = false; //For error reporting
+        for (int i = 0; i < _bindingsSerial.arraySize; i++)
+        {
+            //Make sure the properties are identical. (We can't compare them directly, it'll always fail.)
+            SerializedProperty proptodelete = _bindingsSerial.GetArrayElementAtIndex(i);
+            if (proptodelete.FindPropertyRelative("TargetMethodName").stringValue == minfo.Name &&
+                proptodelete.FindPropertyRelative("ControlObject").objectReferenceValue == lastebind.ControlObject &&
+                proptodelete.FindPropertyRelative("ControlComponent").objectReferenceValue == lastebind.ControlComponent &&
+                proptodelete.FindPropertyRelative("ControlDelegateName").stringValue == lastebind.ControlDelegateName)
+            {
+                _bindingsSerial.DeleteArrayElementAtIndex(i); //This works because it doesn't get applied until next frame. 
+                foundit = true;
+                break;
+            }
+        }
+        if (foundit == false) //Report error if we couldn't find it. 
+        {
+            Debug.LogError("Tried to delete " + lastebind.ControlDelegateName + " binding but couldn't find it in the serialized list.");
+        }
+    }
+
+    public void DrawElement(Rect rect, int index, bool isActive, bool isFocused, Dictionary<MemberInfo, List<EZConsoleBindingEditor>> editorbindings, MemberInfo minfo, Type deltype)
+    {
+        //The list will try to draw newly-deleted objects for one frame. Prevent errors from being thrown. 
+        if (_bindingsSerial.GetArrayElementAtIndex(index) == null) return;
+
+        //Setup editor binding and serialized properties
+        EZConsoleBindingEditor ebind = editorbindings[minfo][index];
+        SerializedProperty controlobjectserial = ebind.SerialBinding.FindPropertyRelative("ControlObject");
+        SerializedProperty controlcomponentserial = ebind.SerialBinding.FindPropertyRelative("ControlComponent");
+        SerializedProperty delegatenameserial = ebind.SerialBinding.FindPropertyRelative("TargetDelegateName");
+
+        //Control object
+        Rect controlobjectrect = new Rect(rect.x, rect.y, rect.width / 2, EditorGUIUtility.singleLineHeight);
+        ebind.ControlObject = (GameObject)EditorGUI.ObjectField(controlobjectrect, ebind.ControlObject, typeof(UnityEngine.Object), true);
+        controlobjectserial.objectReferenceValue = ebind.ControlObject;
+
+        #region Component/Delegate Drop-Down 
+        //Drop-down button for choosing the specific component/delegate. Similar to assigning events to Unity's Button UI. 
+        EditorGUI.BeginDisabledGroup(ebind.ControlObject == null);
+        //Set the name you see on the non-expanded version be either the target delegate name or "No Function." 
+        string dropdowntext;
+        if (ebind.ControlDelegateName == "" || ebind.ControlDelegateName == null)
+        {
+            dropdowntext = "No Function";
+        }
+        else
+        {
+            dropdowntext = ebind.ControlDelegateName;
+        }
+        GUIContent dropdowncontent = new GUIContent(dropdowntext);
+
+
+        Rect dropdownrect = new Rect(rect.x + rect.width / 2, rect.y, rect.width / 2, EditorGUIUtility.singleLineHeight);
+        if (EditorGUI.DropdownButton(dropdownrect, dropdowncontent, FocusType.Keyboard))
+        {
+            GenericMenu menu = new GenericMenu();
+
+            //Add the "No Component" option
+            MenuSelectComponent emptymsc = new MenuSelectComponent()
+            {
+                binding = ebind,
+                bindobject = ebind.ControlObject,
+                component = null,
+                delegatename = null
+            };
+            menu.AddItem(new GUIContent("None"), ebind.ControlComponent == null, SelectFunction, emptymsc);
+
+            menu.AddSeparator("");
+
+            //List all components
+            Component[] components = ebind.ControlObject.GetComponents<Component>();
+            for (int j = 0; j < components.Length; j++)
+            {
+                //List all delegates in the control, whihc includes actions, functions, etc. 
+                List<FieldInfo> fieldinfos = components[j].GetType().GetFields(BindingFlags.Public | BindingFlags.Instance)
+                .Where(t => t.FieldType.IsAssignableFrom(deltype))
+                .ToList();
+
+                foreach (FieldInfo finfo in fieldinfos)
+                {
+                    MenuSelectComponent msc = new MenuSelectComponent()
+                    {
+                        binding = ebind,
+                        component = components[j],
+                        bindobject = ebind.ControlObject,
+                        delegatename = finfo.Name
+                    };
+
+                    string path = components[j].GetType().Name + "/" + finfo.Name;
+                    menu.AddItem(new GUIContent(path), ebind.ControlComponent == components[j], SelectFunction, msc);
+                }
+            }
+
+            menu.ShowAsContext();
+        }
+
+        EditorGUI.EndDisabledGroup();
+        #endregion
+
     }
 
     /// <summary>
@@ -607,6 +646,8 @@ public class EZConsoleBindingEditor
 public class EZConsoleBindingSerial
 {
     [SerializeField]
+    public MemberType TargetType;
+    [SerializeField]
     public string TargetMethodName; //Use GetMethod to interpret
     [SerializeField]
     public GameObject ControlObject;
@@ -614,4 +655,12 @@ public class EZConsoleBindingSerial
     public Component ControlComponent; //Reference to the controlling component
     [SerializeField]
     public string ControlDelegateName; //Use GetField and cast with Expression.GetActionType or GetFunctionType to interpret
+}
+
+public enum MemberType
+{
+    Method, //Includes property getters and setters
+    GetField,  //Binding gets a field
+    SetField, //Binding sets a field
+    Delegate //Exactly what you think
 }

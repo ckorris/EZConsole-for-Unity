@@ -286,7 +286,7 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children: []
   m_Father: {fileID: 0}
-  m_RootOrder: 2
+  m_RootOrder: 3
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &965551461
 MonoBehaviour:
@@ -302,11 +302,8 @@ MonoBehaviour:
   CompileTimeScript: {fileID: 11500000, guid: 7b5ad8fc737db624284838568e094c80, type: 3}
   RuntimeScript: {fileID: 1708092960}
   Bindings:
-  - TargetMethodName: set_BoolProperty
-    ControlObject: {fileID: 1742118428}
-    ControlComponent: {fileID: 1742118429}
-    ControlDelegateName: BoolAction
-  - TargetMethodName: Fire
+  - TargetType: 0
+    TargetMethodName: Fire
     ControlObject: {fileID: 1742118428}
     ControlComponent: {fileID: 1742118429}
     ControlDelegateName: OneShotAction
@@ -340,7 +337,7 @@ MonoBehaviour:
   BoolValue: 0
   FloatValue: 0
   _floatProperty: 5.5
-  InheritedBoolValue: 1
+  NonPropertyBoolValue: 1
 --- !u!4 &1708092961
 Transform:
   m_ObjectHideFlags: 0
@@ -352,7 +349,7 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children: []
   m_Father: {fileID: 0}
-  m_RootOrder: 3
+  m_RootOrder: 4
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1742118428
 GameObject:
@@ -393,7 +390,7 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children: []
   m_Father: {fileID: 0}
-  m_RootOrder: 4
+  m_RootOrder: 2
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &1742118431
 MonoBehaviour:
@@ -409,4 +406,4 @@ MonoBehaviour:
   BoolValue: 0
   FloatValue: 0
   _floatProperty: 5.5
-  InheritedBoolValue: 1
+  NonPropertyBoolValue: 1

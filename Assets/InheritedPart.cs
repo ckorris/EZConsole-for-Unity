@@ -4,7 +4,7 @@ using UnityEngine;
 
 public class InheritedPart : SomePart
 {
-    public bool InheritedBoolValue = true;
+    public bool NonPropertyBoolValue = true;
 
     private bool _inheritedBoolProperty = true;
     public bool InheritedBoolProperty

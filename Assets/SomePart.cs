@@ -22,7 +22,7 @@ public class SomePart : MonoBehaviour
 
     public float FloatValue;
 
-    public float _floatProperty = 5.5f; //Only public for testing in the editor
+    private float _floatProperty = 5.5f; //Only public for testing in the editor
     public float FloatProperty
     {
         get
