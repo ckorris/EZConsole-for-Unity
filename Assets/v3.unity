@@ -301,12 +301,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   CompileTimeScript: {fileID: 11500000, guid: 7b5ad8fc737db624284838568e094c80, type: 3}
   RuntimeScript: {fileID: 1708092960}
-  Bindings:
-  - TargetType: 0
-    TargetMethodName: Fire
-    ControlObject: {fileID: 1742118428}
-    ControlComponent: {fileID: 1742118429}
-    ControlDelegateName: OneShotAction
+  Bindings: []
 --- !u!1 &1708092959
 GameObject:
   m_ObjectHideFlags: 0
@@ -336,7 +331,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   BoolValue: 0
   FloatValue: 0
-  _floatProperty: 5.5
   NonPropertyBoolValue: 1
 --- !u!4 &1708092961
 Transform:
@@ -405,5 +399,4 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   BoolValue: 0
   FloatValue: 0
-  _floatProperty: 5.5
   NonPropertyBoolValue: 1

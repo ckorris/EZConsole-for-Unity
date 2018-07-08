@@ -24,13 +24,17 @@ public class Console : MonoBehaviour
 
     List<RegisteredBindingReference> Registrations = new List<RegisteredBindingReference>(); //Holds references to registrations that can be used to de-register them. 
 
-    MethodInfo _registerMethod; //TMethodInfo for making a generic version of RegisterDelegateHelper<T>. Caching saves on reflection. 
+    MethodInfo _registerMethod; //MethodInfo for making a generic version of RegisterMethodDelegateHelper<T>. Caching saves on reflection. 
+    MethodInfo _registerGetValue; //For generic version of RegisterGetValueDelegateHelper<T>. 
+    MethodInfo _registerSetValue;//For generic version of RegisterSetValueDelegateHelper<T>. 
 
     // Use this for initialization
     void Start()
     {
         //Cache the method that registers a delegate. (May need to turn into list if we use the 32 brute force Func/Action thingy.)
-        _registerMethod = typeof(Console).GetMethod("RegisterDelegateHelper", BindingFlags.Instance | BindingFlags.NonPublic);
+        _registerMethod = typeof(Console).GetMethod("RegisterMethodDelegateHelper", BindingFlags.Instance | BindingFlags.NonPublic);
+        _registerGetValue = typeof(Console).GetMethod("RegisterGetFieldDelegateHelper", BindingFlags.Instance | BindingFlags.NonPublic);
+        _registerSetValue = typeof(Console).GetMethod("RegisterSetFieldDelegateHelper", BindingFlags.Instance | BindingFlags.NonPublic);
 
         SetUpBindings(); //Turn bindings into actual registrations. 
     }
@@ -40,11 +44,26 @@ public class Console : MonoBehaviour
         //TODO: Store methodinfos in a dictionary with the name as a key so multiple delegates on one method only need one reflection call. 
         foreach (EZConsoleBindingSerial binding in Bindings)
         {
-            MethodInfo minfo = RuntimeScript.GetType().GetMethod(binding.TargetMethodName); //The method to register
+            MethodInfo minfo;
             FieldInfo finfo = binding.ControlComponent.GetType().GetField(binding.ControlDelegateName); //The delegate to add the method to
 
-            //TODO: Try replicating old register methods, but pass the whole delegate type as T instead of the delegate argument type. 
-            RegisterDelegate(minfo, finfo, binding.ControlComponent);
+            switch (binding.TargetType)
+            {
+                case MemberType.Method:
+                    minfo = RuntimeScript.GetType().GetMethod(binding.TargetMethodName); //The method to register
+                    RegisterMethodDelegate(minfo, finfo, binding.ControlComponent);
+                    break;
+                case MemberType.GetField:
+                    FieldInfo getvalinfo = RuntimeScript.GetType().GetField(binding.TargetMethodName);
+                    MethodInfo registergetgeneric = _registerGetValue.MakeGenericMethod(getvalinfo.FieldType);
+                    registergetgeneric.Invoke(this, new object[] { getvalinfo, finfo, binding.ControlComponent });
+                    break;
+                case MemberType.SetField:
+                    FieldInfo setvalinfo = RuntimeScript.GetType().GetField(binding.TargetMethodName);
+                    MethodInfo registersetgeneric = _registerSetValue.MakeGenericMethod(setvalinfo.FieldType);
+                    registersetgeneric.Invoke(this, new object[] { setvalinfo, finfo, binding.ControlComponent });
+                    break;
+            }
         }
     }
 
@@ -68,7 +87,7 @@ public class Console : MonoBehaviour
     {
         if (newscript != oldscript)
         {
-            if (Application.isPlaying) 
+            if (Application.isPlaying)
             {
                 if (oldscript != null) //Remove old bindings
                 {
@@ -95,7 +114,7 @@ public class Console : MonoBehaviour
     /// <param name="minfo"></param>
     /// <param name="finfo"></param>
     /// <param name="component"></param>
-    private void RegisterDelegate(MethodInfo minfo, FieldInfo finfo, Component component)
+    private void RegisterMethodDelegate(MethodInfo minfo, FieldInfo finfo, Component component)
     {
         //Find the return type of the target method
         Type returntype = minfo.ReturnType;
@@ -129,28 +148,68 @@ public class Console : MonoBehaviour
     }
 
     /// <summary>
-    /// The final step of RegisterDelegate(), which needs to be generic. 
+    /// Creates a "getter" lambda function for a value in RuntimeScript, and subscribes it. 
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
+    /// <param name="valfinfo"></param>
+    /// <param name="delfinfo"></param>
+    /// <param name="component"></param>
+    private void RegisterGetFieldDelegateHelper<T>(FieldInfo valfinfo, FieldInfo delfinfo, Component component)
+    {
+        Func<T> getval = () => (T)valfinfo.GetValue(RuntimeScript);
+        RegisterDelegateFinal(getval, delfinfo, component);
+        return;
+    }
+
+    /// <summary>
+    /// Creates a "setter" lambda function for a value in RuntimeScript, and subscribes it. 
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
+    /// <param name="valfinfo"></param>
+    /// <param name="delfinfo"></param>
+    /// <param name="component"></param>
+    private void RegisterSetFieldDelegateHelper<T>(FieldInfo valfinfo, FieldInfo delfinfo, Component component)
+    {
+        Action<T> setval = (v) => valfinfo.SetValue(RuntimeScript, v);
+        RegisterDelegateFinal(setval, delfinfo, component);
+        return;
+    }
+
+
+    /// <summary>
+    /// The final step of RegisterMethodDelegate(), which needs to be generic. 
     /// Don't call directly but use _registerMethod.MakeGenericMethod(type) instead, where type = the Func/Action type. 
     /// </summary>
     /// <typeparam name="T"></typeparam>
     /// <param name="metinfo"></param>
     /// <param name="finfo"></param>
     /// <param name="component"></param>
-    private void RegisterDelegateHelper<T>(MethodInfo metinfo, FieldInfo finfo, Component component)
+    private void RegisterMethodDelegateHelper<T>(MethodInfo metinfo, FieldInfo finfo, Component component)
     {
-        //To test. May need to make 16 versions for Action<T1,T2,T3> etc. and same with Func. But I want to avoid that. 
         Delegate mdelegate = Delegate.CreateDelegate(typeof(T), RuntimeScript, metinfo.Name);
+        RegisterDelegateFinal(mdelegate, finfo, component);
+        return;
+    }
 
+    /// <summary>
+    /// Takes the finished delegates and target delegates and actually sends the registration command. 
+    /// Called by the generic Register____DelegateHelper methods. 
+    /// </summary>
+    /// <param name="toregister"></param>
+    /// <param name="target"></param>
+    /// <param name="component"></param>
+    private void RegisterDelegateFinal(Delegate toregister, FieldInfo target, Component component)
+    {
         //Register into field
-        MulticastDelegate targetdelegate = finfo.GetValue(component) as MulticastDelegate; //Get the target delegate
-        Delegate combodelegate = Delegate.Combine(mdelegate, targetdelegate); //Add the new delegate to the invocation list of the old one
-        finfo.SetValue(component, combodelegate); //Set the delegate to the combined list
+        MulticastDelegate targetdelegate = target.GetValue(component) as MulticastDelegate; //Get the target delegate
+        Delegate combodelegate = Delegate.Combine(toregister, targetdelegate); //Add the new delegate to the invocation list of the old one
+        target.SetValue(component, combodelegate); //Set the delegate to the combined list
 
         //Store registration in Registrations in case we remove it later. 
         Registrations.Add(new RegisteredBindingReference()
         {
-            MDelegate = mdelegate,
-            DelFInfo = finfo, 
+            MDelegate = toregister,
+            DelFInfo = target,
             ControlComponent = component
         });
     }
@@ -235,7 +294,7 @@ public class ConsoleV3Editor : Editor
 
     public override void OnInspectorGUI()
     {
-        DrawDefaultInspector();
+        //DrawDefaultInspector();
         GUILayoutOption[] layoutoptions = new GUILayoutOption[2]
         {
             GUILayout.MaxWidth(EditorGUIUtility.currentViewWidth / 2),
@@ -283,7 +342,7 @@ public class ConsoleV3Editor : Editor
             //Get list of methods using reflection. 
             //Yes, it's calling this reflection every frame, but it's ONE inspector window at a time so you'd need like 100k+ methods to notice it. 
             //Alternatives would offer little performance gain in exchange for lots of script complexity. 
-            MethodInfo[] methods = _scriptType.GetMethods(BindingFlags.Instance | BindingFlags.Public) 
+            MethodInfo[] methods = _scriptType.GetMethods(BindingFlags.Instance | BindingFlags.Public)
                 .Where(x => !x.DeclaringType.IsAssignableFrom(typeof(MonoBehaviour)))
                 .ToArray();
 
@@ -296,7 +355,7 @@ public class ConsoleV3Editor : Editor
             {
                 editorbindings.Add(methods[i], new List<EZConsoleBindingEditor>());
             }
-            for(int i = 0; i < fields.Length; i++)
+            for (int i = 0; i < fields.Length; i++)
             {
                 editorbindings.Add(fields[i], new List<EZConsoleBindingEditor>());
             }
@@ -351,12 +410,67 @@ public class ConsoleV3Editor : Editor
                     {
                         paramtypes[p] = paraminfos[p].ParameterType;
                     }
+
+                    //Get the type of delegate that we'll need to assign to this. 
+                    Type deltype;
+                    if (returntype == typeof(void)) //Action type
+                    {
+                        deltype = Expression.GetActionType(paramtypes);
+                    }
+                    else //Func type
+                    {
+                        Array.Resize(ref paramtypes, paramtypes.Length + 1);
+                        paramtypes[paramtypes.Length - 1] = returntype;
+
+                        deltype = Expression.GetFuncType(paramtypes);
+                    }
+
+                    //Make the list 
+                    ReorderableList reorderablelist = new ReorderableList(editorbindings[minfo], typeof(EZConsoleBindingEditor), true, true, true, true);
+
+                    //Now we assign to all the ReorderableList's callbacks that we need. Unity handles when they're fired. 
+                    reorderablelist.drawHeaderCallback = (Rect rect) => DrawHeader(rect, minfo.Name, deltype, returntype, paramtypes); //Add label to the header
+                    reorderablelist.onCanRemoveCallback = (list) => { return list.list.Count > 0; }; //We can always press the remove button for now because it's glitchy as hell in Unity. 
+                    reorderablelist.onAddCallback = (list) => AddBinding(list, minfo, MemberType.Method); //Add a new binding. 
+                    reorderablelist.onRemoveCallback = (list) => RemoveBinding(list, minfo, MemberType.Method); //Removes the last binding on the list. 
+                    reorderablelist.drawElementCallback = (rect, index, isActive, isFocused) => DrawElement(rect, index, isActive, isFocused, editorbindings[minfo], deltype, MemberType.Method); //Draw the entire list. 
+
+                    reorderablelist.index = reorderablelist.count - 1; //We need this for the removal button to work, because the index isn't set in any sane or observable way in Unity. 
+                    reorderablelist.DoLayoutList(); //Display the list.
+
                 }
-                else if(minfo.MemberType == MemberTypes.Field)
+                else if (minfo.MemberType == MemberTypes.Field)
                 {
                     FieldInfo fieldinfo = (FieldInfo)minfo;
                     returntype = fieldinfo.FieldType;
-                    paramtypes = new Type[1] { fieldinfo.FieldType };
+                    paramtypes = new Type[1] { fieldinfo.FieldType }; //Works for both func and action! So it can be reused for both the "getter" and "setter." 
+
+                    //Make a list of "getters" for the field.
+                    ReorderableList getreorderablelist = new ReorderableList(editorbindings[minfo], typeof(EZConsoleBindingEditor), true, true, true, true);
+
+                    //Add callbacks. When asked for MemberType, specify GetField. 
+                    //Type[] funcparams = new Type[1] { returntype }; //The params for a Func that returns returntype but has no actual params. 
+                    getreorderablelist.drawHeaderCallback = (Rect rect) => DrawHeader(rect, "get_" + minfo.Name, Expression.GetFuncType(paramtypes), returntype, paramtypes);
+                    getreorderablelist.onCanRemoveCallback = (list) => { return true; }; //We can always press the remove button for now because it's glitchy as hell in Unity. 
+                    getreorderablelist.onAddCallback = (list) => AddBinding(list, minfo, MemberType.GetField);
+                    getreorderablelist.onRemoveCallback = (list) => RemoveBinding(list, minfo, MemberType.GetField);
+                    getreorderablelist.drawElementCallback = (rect, index, isActive, isFocused) => DrawElement(rect, index, isActive, isFocused, editorbindings[minfo], Expression.GetFuncType(paramtypes), MemberType.GetField);
+
+                    getreorderablelist.index = getreorderablelist.count - 1;
+                    getreorderablelist.DoLayoutList();
+
+                    //Make the "setters" list for the field. 
+                    ReorderableList setreorderablelist = new ReorderableList(editorbindings[minfo], typeof(EZConsoleBindingEditor), true, true, true, true);
+
+                    //Add callbacks. When asked for MemberType, specify SetField.
+                    setreorderablelist.drawHeaderCallback = (Rect rect) => DrawHeader(rect, "set_" + minfo.Name, Expression.GetActionType(paramtypes), typeof(void), paramtypes);
+                    setreorderablelist.onCanRemoveCallback = (list) => { return true; }; //We can always press the remove button for now because it's glitchy as hell in Unity. 
+                    setreorderablelist.onAddCallback = (list) => AddBinding(list, minfo, MemberType.SetField);
+                    setreorderablelist.onRemoveCallback = (list) => RemoveBinding(list, minfo, MemberType.SetField);
+                    setreorderablelist.drawElementCallback = (rect, index, isActive, isFocused) => DrawElement(rect, index, isActive, isFocused, editorbindings[minfo], Expression.GetActionType(paramtypes), MemberType.SetField);
+
+                    setreorderablelist.index = getreorderablelist.count - 1;
+                    setreorderablelist.DoLayoutList();
                 }
                 else
                 {
@@ -365,50 +479,16 @@ public class ConsoleV3Editor : Editor
                     Debug.LogError("Console created memberinfo that's not a MethodInfo or FieldInfo");
                 }
 
-                //Get the type of delegate that we'll need to assign to this. 
-                Type deltype;
-                if (returntype == typeof(void)) //Action type
-                {
-                    deltype = Expression.GetActionType(paramtypes);
-                }
-                else //Func type
-                {
-                    Array.Resize(ref paramtypes, paramtypes.Length + 1);
-                    paramtypes[paramtypes.Length - 1] = returntype;
-
-                    deltype = Expression.GetFuncType(paramtypes);
-                }
-
-                //Make the list 
-                ReorderableList reorderablelist = new ReorderableList(editorbindings[minfo], typeof(EZConsoleBindingEditor), true, true, true, true);
-
-                #region ReorderableList Callback Assignments
-                //Now we assign to all the ReorderableList's callbacks that we need. Unity handles when they're fired. 
-                //Add label to the header
-                reorderablelist.drawHeaderCallback = (Rect rect) => DrawHeader(rect, minfo, deltype, returntype, paramtypes);
-
-                //We can always press the remove button for now because it's glitchy as hell in Unity. 
-                reorderablelist.onCanRemoveCallback = (list) => { return list.list.Count > 0; };
-
-                //Pressing the add button should add to the serialized list, not the editor binding list. 
-                reorderablelist.onAddCallback = (list) => AddBinding(list, minfo);
-
-                //Pressing the delete button, likewise, removes from the serialized list. But we have to properly point to the last item with this methodinfo.
-                reorderablelist.onRemoveCallback = (list) => RemoveBinding(list, minfo);
-
-                //Drawing is gonna be complicated. We're drawing based on the editorbinding, but we have to make sure changes write to the serializedproperty. 
-                reorderablelist.drawElementCallback = (rect, index, isActive, isFocused) => DrawElement(rect, index, isActive, isFocused, editorbindings, minfo, deltype);
-                #endregion
-
-                reorderablelist.index = reorderablelist.count - 1; //We need this for the removal button to work, because the index isn't set in any sane or observable way in Unity. 
-                reorderablelist.DoLayoutList(); //Display the list.
             }
             #endregion
 
             _consoleSerial.ApplyModifiedProperties(); //Updates the SerializedObject that holds all the properties - they don't actually change until you do this. 
+
         }
+
     }
 
+    #region ReorderableList Callbacks
     /// <summary>
     /// When you select a component in the Bindings List menu, it calls this. Note that choosing "No Function" will pass the GameObject, 
     /// hence why it takes Object as an argument instead of component. 
@@ -436,10 +516,18 @@ public class ConsoleV3Editor : Editor
         msc.binding.SerialBinding.FindPropertyRelative("ControlDelegateName").stringValue = msc.delegatename;
     }
 
-    public void DrawHeader(Rect rect, MemberInfo minfo, Type deltype, Type returntype, Type[] paramtypes)
+    /// <summary>
+    /// Draws the header on a ReorderableList.
+    /// </summary>
+    /// <param name="rect"></param>
+    /// <param name="minfo"></param>
+    /// <param name="deltype"></param>
+    /// <param name="returntype"></param>
+    /// <param name="paramtypes"></param>
+    public void DrawHeader(Rect rect, string name, Type deltype, Type returntype, Type[] paramtypes)
     {
         EditorGUILayout.BeginHorizontal();
-        EditorGUI.LabelField(new Rect(rect.x, rect.y, rect.width / 2, rect.height), minfo.Name, EditorStyles.boldLabel);
+        EditorGUI.LabelField(new Rect(rect.x, rect.y, rect.width / 2, rect.height), name, EditorStyles.boldLabel);
 
         //Make a string to represent the delegate type. (If we just convert to string, it'll be "Func`1" or some garbage
         string deltypename;
@@ -450,20 +538,10 @@ public class ConsoleV3Editor : Editor
             deltypename += ConvertToSimpleName(ptype) + ", ";
         }
 
-        if (returntype != typeof(void) && returntype != null)
+        int? last = deltypename.LastIndexOf(", ");
+        if ((int)last > 0)
         {
-
-            deltypename += ConvertToSimpleName(returntype);
-        }
-        else
-        {
-
-            int? last = deltypename.LastIndexOf(", ");
-            if ((int)last > 0)
-            {
-                deltypename = deltypename.Remove((int)last, 2); //Remove the last comma we added //(new char[2] { ',', ' ' }); 
-            }
-
+            deltypename = deltypename.Remove((int)last, 2); //Remove the last comma we added //(new char[2] { ',', ' ' }); 
         }
 
         deltypename += ">";
@@ -473,7 +551,14 @@ public class ConsoleV3Editor : Editor
         EditorGUILayout.EndHorizontal();
     }
 
-    public void AddBinding(ReorderableList list, MemberInfo minfo)
+    /// <summary>
+    /// Adds a new binding to a ReorderableList. 
+    /// Pressing the add button should add to the serialized list, not the editor binding list. 
+    /// </summary>
+    /// <param name="list"></param>
+    /// <param name="minfo"></param>
+    /// <param name="type"></param>
+    public void AddBinding(ReorderableList list, MemberInfo minfo, MemberType type)
     {
         _bindingsSerial.arraySize += 1;
         SerializedProperty newprop = _bindingsSerial.GetArrayElementAtIndex(_bindingsSerial.arraySize - 1);
@@ -481,15 +566,36 @@ public class ConsoleV3Editor : Editor
         newprop.FindPropertyRelative("ControlObject").objectReferenceValue = null;
         newprop.FindPropertyRelative("ControlComponent").objectReferenceValue = null;
         newprop.FindPropertyRelative("ControlDelegateName").stringValue = "";
+        newprop.FindPropertyRelative("TargetType").intValue = (int)type;
     }
 
-    public void RemoveBinding(ReorderableList list, MemberInfo minfo)
+    /// <summary>
+    /// Removes a binding from a ReorderableList. 
+    /// </summary>
+    /// <param name="list"></param>
+    /// <param name="minfo"></param>
+    public void RemoveBinding(ReorderableList list, MemberInfo minfo, MemberType type)
     {
         if (list.count <= 0) return;
 
-        EZConsoleBindingEditor lastebind = (EZConsoleBindingEditor)list.list[list.list.Count - 1];
-        //Find the index of lastebind's serializedproperty in _bindingsSerial
+        //Find the highest index of a binding with the correct MemberType. 
+        EZConsoleBindingEditor lastebind = null;
+        for (int i = list.list.Count - 1; i >= 0; i--)
+        {
+            EZConsoleBindingEditor ebind = (EZConsoleBindingEditor)list.list[i];
+            MemberType ebindtype = (MemberType)ebind.SerialBinding.FindPropertyRelative("TargetType").intValue;
+            if (ebindtype == type)
+            {
+                lastebind = ebind;
+                break;
+            }
+        }
 
+        if (lastebind == null) return;
+
+        //EZConsoleBindingEditor lastebind = (EZConsoleBindingEditor)list.list[list.list.Count - 1];
+
+        //Find the index of lastebind's serializedproperty in _bindingsSerial
         bool foundit = false; //For error reporting
         for (int i = 0; i < _bindingsSerial.arraySize; i++)
         {
@@ -511,13 +617,16 @@ public class ConsoleV3Editor : Editor
         }
     }
 
-    public void DrawElement(Rect rect, int index, bool isActive, bool isFocused, Dictionary<MemberInfo, List<EZConsoleBindingEditor>> editorbindings, MemberInfo minfo, Type deltype)
+    public void DrawElement(Rect rect, int index, bool isActive, bool isFocused, List<EZConsoleBindingEditor> bindingslist, Type deltype, MemberType type)
     {
         //The list will try to draw newly-deleted objects for one frame. Prevent errors from being thrown. 
         if (_bindingsSerial.GetArrayElementAtIndex(index) == null) return;
 
         //Setup editor binding and serialized properties
-        EZConsoleBindingEditor ebind = editorbindings[minfo][index];
+        EZConsoleBindingEditor ebind = bindingslist[index];
+        SerializedProperty targettype = ebind.SerialBinding.FindPropertyRelative("TargetType");
+        if ((MemberType)targettype.intValue != type) return;
+
         SerializedProperty controlobjectserial = ebind.SerialBinding.FindPropertyRelative("ControlObject");
         SerializedProperty controlcomponentserial = ebind.SerialBinding.FindPropertyRelative("ControlComponent");
         SerializedProperty delegatenameserial = ebind.SerialBinding.FindPropertyRelative("TargetDelegateName");
@@ -591,6 +700,7 @@ public class ConsoleV3Editor : Editor
         #endregion
 
     }
+    #endregion
 
     /// <summary>
     /// Returns the simple name of common types, so you can print "float" instead of "Single". 
@@ -600,7 +710,7 @@ public class ConsoleV3Editor : Editor
     /// <returns></returns>
     static string ConvertToSimpleName(Type type)
     {
-        switch(type.Name)
+        switch (type.Name)
         {
             case "Single":
                 return "float";

@@ -11,6 +11,8 @@ public class TestFuncControl : MonoBehaviour
 
     public Func<bool, bool> ChangeBoolFunc;
 
+    public Func<bool> GetBoolFunc;
+
 	// Use this for initialization
 	void Start ()
     {
@@ -23,12 +25,18 @@ public class TestFuncControl : MonoBehaviour
 
         //print(ChangeBoolFunc.Invoke(true));
 
-
 	}
 	
 	// Update is called once per frame
 	void Update ()
     {
+        if(Input.GetKeyDown(KeyCode.B))
+        {
+            bool oldbool = GetBoolFunc.Invoke();
+            print("Old bool = " + oldbool + ". Inverting.");
+            BoolAction.Invoke(!oldbool);
+        }
+
 		if(Input.GetKeyDown(KeyCode.Space))
         {
             if(OneShotAction != null) OneShotAction.Invoke();
