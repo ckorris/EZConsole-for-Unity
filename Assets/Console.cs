@@ -620,12 +620,15 @@ public class ConsoleV3Editor : Editor
     public void DrawElement(Rect rect, int index, bool isActive, bool isFocused, List<EZConsoleBindingEditor> bindingslist, Type deltype, MemberType type)
     {
         //The list will try to draw newly-deleted objects for one frame. Prevent errors from being thrown. 
-        if (_bindingsSerial.GetArrayElementAtIndex(index) == null) return;
+        if (_bindingsSerial.arraySize <= index || _bindingsSerial.GetArrayElementAtIndex(index) == null) return;
 
         //Setup editor binding and serialized properties
         EZConsoleBindingEditor ebind = bindingslist[index];
         SerializedProperty targettype = ebind.SerialBinding.FindPropertyRelative("TargetType");
-        if ((MemberType)targettype.intValue != type) return;
+        if ((MemberType)targettype.intValue != type)
+        {
+            return;
+        }
 
         SerializedProperty controlobjectserial = ebind.SerialBinding.FindPropertyRelative("ControlObject");
         SerializedProperty controlcomponentserial = ebind.SerialBinding.FindPropertyRelative("ControlComponent");

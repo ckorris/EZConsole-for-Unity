@@ -301,7 +301,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   CompileTimeScript: {fileID: 11500000, guid: 7b5ad8fc737db624284838568e094c80, type: 3}
   RuntimeScript: {fileID: 1708092960}
-  Bindings: []
+  Bindings:
+  - TargetType: 1
+    TargetMethodName: FloatValue
+    ControlObject: {fileID: 0}
+    ControlComponent: {fileID: 0}
+    ControlDelegateName: 
 --- !u!1 &1708092959
 GameObject:
   m_ObjectHideFlags: 0
